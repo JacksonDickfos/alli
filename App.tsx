@@ -17,7 +17,7 @@ export default function App() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('http://192.168.4.23:3001/message')
+    fetch('https://alli-dzbt.onrender.com/message')
       .then((res) => res.json())
       .then((data) => {
         setMessage(data.message);
