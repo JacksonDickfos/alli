@@ -3,18 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Alli Nutrition App</title>
-    
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/alli-logo.png" />
-    <meta name="theme-color" content="#B9A68D" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Alli" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
@@ -22,20 +12,15 @@
       body {
         height: 100%;
       }
-      /* Allow body scrolling on mobile so focusing inputs can scroll into view and show the keyboard */
+      /* These styles disable body scrolling if you are using <ScrollView> */
       body {
-        overflow: auto !important;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden;
       }
       /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
-      }
-      /* Prevent iOS zoom on focus */
-      input, textarea, select {
-        font-size: 16px;
       }
     </style>
   <link rel="icon" href="/favicon.ico" /></head>
@@ -47,29 +32,6 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-
-  <script>
-    // iOS PWA: ensure focusing inputs scrolls them into view which triggers the keyboard in standalone
-    (function() {
-      var isStandalone = window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone);
-      if (!isStandalone) return;
-      document.addEventListener('focusin', function(e) {
-        var t = e.target;
-        if (!t || !t.tagName) return;
-        var tag = String(t.tagName).toLowerCase();
-        if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-          // Defer to allow browser to begin focus, then scroll into view
-          setTimeout(function() {
-            try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) {}
-            // Nudge scroll to force layout
-            window.scrollTo({ top: window.scrollY + 1 });
-            window.scrollTo({ top: Math.max(0, window.scrollY - 1) });
-          }, 100);
-        }
-      });
-    })();
-  </script>
-
-  <script src="/_expo/static/js/web/index-05335a48c820166c28f72f0528f97504.js" defer></script>
+  <script src="/_expo/static/js/web/index-192a4bcad5dc3b92c34994096b4ead01.js" defer></script>
 </body>
 </html>

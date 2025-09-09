@@ -211,22 +211,25 @@ function SignUpScreen({ navigation, onAuth }: any) {
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert('Missing info', 'Please enter an email and password.');
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch('https://alli-dzbt.onrender.com/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        Alert.alert('Success', 'Registration successful! Please log in.');
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Error', data.error || 'Registration failed.');
+      const usersJson = await AsyncStorage.getItem('users');
+      const users = usersJson ? JSON.parse(usersJson) : {};
+      if (users[email]) {
+        Alert.alert('Account exists', 'An account with this email already exists. Please log in.');
+        setLoading(false);
+        return;
       }
+      users[email] = { password };
+      await AsyncStorage.setItem('users', JSON.stringify(users));
+      Alert.alert('Success', 'Registration successful! You can now log in.');
+      navigation.navigate('Login');
     } catch (err) {
-      Alert.alert('Error', 'Network error.');
+      Alert.alert('Error', 'Unexpected error creating your account.');
     } finally {
       setLoading(false);
     }
@@ -244,6 +247,8 @@ function SignUpScreen({ navigation, onAuth }: any) {
         autoCapitalize="none"
         value={email}
         onChangeText={setEmail}
+        inputMode="email"
+        autoCorrect={false}
       />
       <TextInput
         style={styles.input}
@@ -273,26 +278,36 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Missing info', 'Please enter an email and password.');
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch('https://alli-dzbt.onrender.com/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (res.ok && data.token) {
-        await AsyncStorage.setItem('token', data.token);
+      const usersJson = await AsyncStorage.getItem('users');
+      const users = usersJson ? JSON.parse(usersJson) : {};
+      const record = users[email];
+      if (!record || record.password !== password) {
+        Alert.alert('Invalid credentials', 'Email or password is incorrect.');
+      } else {
+        await AsyncStorage.setItem('token', `demo-token:${email}`);
         onAuth();
         Alert.alert('Success', 'Logged in!');
-      } else {
-        Alert.alert('Error', data.error || 'Login failed.');
       }
     } catch (err) {
-      Alert.alert('Error', 'Network error.');
+      Alert.alert('Error', 'Unexpected error logging in.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Enter email', 'Please enter your email above first, then tap Forgot Password again.');
+      return;
+    }
+    // Demo flow: pretend to send reset link
+    Alert.alert('Password reset', `A reset link would be sent to ${email} in a real app.`);
   };
 
   return (
@@ -307,6 +322,8 @@ function LoginScreen({ navigation, onAuth }: any) {
         autoCapitalize="none"
         value={email}
         onChangeText={setEmail}
+        inputMode="email"
+        autoCorrect={false}
       />
       <TextInput
         style={styles.input}
@@ -324,6 +341,7 @@ function LoginScreen({ navigation, onAuth }: any) {
           {loading ? 'Logging In...' : 'Log In'}
         </Text>
       </TouchableOpacity>
+      <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
       <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
       <StatusBar style="auto" />
     </View>
