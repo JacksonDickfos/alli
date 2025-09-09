@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
+import { supabase } from './lib/supabase';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -217,17 +218,13 @@ function SignUpScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const usersJson = await AsyncStorage.getItem('users');
-      const users = usersJson ? JSON.parse(usersJson) : {};
-      if (users[email]) {
-        Alert.alert('Account exists', 'An account with this email already exists. Please log in.');
-        setLoading(false);
-        return;
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        Alert.alert('Sign up failed', error.message);
+      } else {
+        Alert.alert('Success', 'Check your email to confirm your account, then log in.');
+        navigation.navigate('Login');
       }
-      users[email] = { password };
-      await AsyncStorage.setItem('users', JSON.stringify(users));
-      Alert.alert('Success', 'Registration successful! You can now log in.');
-      navigation.navigate('Login');
     } catch (err) {
       Alert.alert('Error', 'Unexpected error creating your account.');
     } finally {
@@ -284,13 +281,11 @@ function LoginScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const usersJson = await AsyncStorage.getItem('users');
-      const users = usersJson ? JSON.parse(usersJson) : {};
-      const record = users[email];
-      if (!record || record.password !== password) {
-        Alert.alert('Invalid credentials', 'Email or password is incorrect.');
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error || !data.session) {
+        Alert.alert('Invalid credentials', error?.message || 'Email or password is incorrect.');
       } else {
-        await AsyncStorage.setItem('token', `demo-token:${email}`);
+        await AsyncStorage.setItem('token', data.session.access_token);
         onAuth();
         Alert.alert('Success', 'Logged in!');
       }
@@ -306,8 +301,18 @@ function LoginScreen({ navigation, onAuth }: any) {
       Alert.alert('Enter email', 'Please enter your email above first, then tap Forgot Password again.');
       return;
     }
-    // Demo flow: pretend to send reset link
-    Alert.alert('Password reset', `A reset link would be sent to ${email} in a real app.`);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        Alert.alert('Reset failed', error.message);
+      } else {
+        Alert.alert('Password reset', `We sent a reset link to ${email}.`);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Unexpected error requesting password reset.');
+    }
   };
 
   return (
