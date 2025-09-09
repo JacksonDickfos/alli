@@ -607,15 +607,30 @@ type AlliTabBarButtonProps = {
 };
 
 function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
+  const pulse = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        RNAnimated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <TouchableOpacity
         onPress={onPress}
         style={{
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          backgroundColor: '#B9A68D',
+          width: 64,
+          height: 64,
+          borderRadius: 32,
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 5,
@@ -623,7 +638,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
             ios: {
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
+              shadowOpacity: 0.25,
               shadowRadius: 8,
             },
             android: {
@@ -632,18 +647,36 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
           }),
         }}
       >
-        <LinearGradient
-          colors={['#B9A68D', '#8B7355']}
-          style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="chatbubble" size={24} color="white" />
-        </LinearGradient>
+        <RNAnimated.View style={{ transform: [{ scale }], opacity }}>
+          <LinearGradient
+            colors={[ '#4F8EF7', '#8A2BE2', '#FF3B30' ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image
+                source={require('./assets/alli-logo.png')}
+                style={{ width: 36, height: 36, resizeMode: 'contain' }}
+              />
+            </View>
+          </LinearGradient>
+        </RNAnimated.View>
       </TouchableOpacity>
     </View>
   );
