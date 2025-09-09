@@ -22,16 +22,35 @@
         height: 100%;
         flex: 1;
       }
+      #update-banner { position: fixed; left: 0; right:0; bottom: 0; background:#111; color:#fff; padding: 12px; display:none; z-index: 9999; }
+      #update-banner button { margin-left: 10px; background:#B9A68D; color:#fff; border:none; padding:8px 12px; border-radius:6px; }
     </style>
   <link rel="icon" href="/favicon.ico" /></head>
 
   <body>
+    <div id="update-banner">An update is available. <button id="reload-btn">Reload</button></div>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-192a4bcad5dc3b92c34994096b4ead01.js" defer></script>
+  <script>
+    (function(){
+      try {
+        var key = 'alli_bundle_hash';
+        var current = 'index-37ce83037626085b370902c041174dfe.js';
+        var stored = localStorage.getItem(key);
+        if (stored && stored !== current) {
+          var b = document.getElementById('update-banner');
+          var r = document.getElementById('reload-btn');
+          b.style.display = 'block';
+          r.onclick = function(){ location.reload(true); };
+        }
+        localStorage.setItem(key, current);
+      } catch (e) {}
+    })();
+  </script>
+  <script src="/_expo/static/js/web/index-37ce83037626085b370902c041174dfe.js" defer></script>
 </body>
 </html>

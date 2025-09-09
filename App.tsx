@@ -654,15 +654,33 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Clear any existing tokens for demo purposes
-    AsyncStorage.removeItem('token').then(() => {
-      setIsLoggedIn(false);
-      setLoading(false);
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        setIsLoggedIn(!!data.session);
+      } catch {
+        if (!isMounted) return;
+        setIsLoggedIn(false);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
     });
+
+    return () => {
+      isMounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
+    try { await supabase.auth.signOut(); } catch {}
     setIsLoggedIn(false);
   };
 
