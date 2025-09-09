@@ -312,11 +312,64 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     const msg = parseAuthMessageFromUrl();
-    if (msg) setNotice({ text: msg.banner, type: msg.type });
+    if (msg) {
+      setNotice({ text: msg.banner, type: msg.type });
+      if (msg.type === 'info' && msg.banner.toLowerCase().includes('password reset')) {
+        setIsRecoveryMode(true);
+      }
+      if (typeof window !== 'undefined') {
+        // Clean URL params so refresh doesn't keep re-triggering
+        const url = new URL(window.location.href);
+        url.searchParams.delete('type');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
   }, []);
+
+  const handlePerformReset = async () => {
+    const p1 = newPassword.trim();
+    const p2 = confirmPassword.trim();
+    if (!p1 || !p2) {
+      setNotice({ text: 'Please enter and confirm your new password.', type: 'error' });
+      Alert.alert('Missing info', 'Please enter and confirm your new password.');
+      return;
+    }
+    if (p1 !== p2) {
+      setNotice({ text: 'Passwords do not match. Please re-enter.', type: 'error' });
+      Alert.alert('Passwords do not match', 'Please re-enter your new password twice.');
+      return;
+    }
+    if (p1.length < 8) {
+      setNotice({ text: 'Password must be at least 8 characters.', type: 'error' });
+      Alert.alert('Weak password', 'Password must be at least 8 characters.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password: p1 });
+      if (error) {
+        setNotice({ text: error.message, type: 'error' });
+        Alert.alert('Reset failed', error.message);
+      } else {
+        setNotice({ text: 'Password updated. You can now log in with your new password.', type: 'success' });
+        Alert.alert('Success', 'Password updated. Please log in.');
+        setIsRecoveryMode(false);
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
+      setNotice({ text: 'Unexpected error updating your password.', type: 'error' });
+      Alert.alert('Error', 'Unexpected error updating your password.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
@@ -378,33 +431,66 @@ function LoginScreen({ navigation, onAuth }: any) {
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
       {notice && <NoticeBanner message={notice.text} type={notice.type} />}
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-        inputMode="email"
-        autoCorrect={false}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.buttonDisabled]} 
-        onPress={handleLogin} 
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Logging In...' : 'Log In'}
-        </Text>
-      </TouchableOpacity>
-      <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
-      <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
+
+      {isRecoveryMode ? (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="New password"
+            secureTextEntry
+            value={newPassword}
+            onChangeText={setNewPassword}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+          />
+          <TouchableOpacity 
+            style={[styles.button, loading && styles.buttonDisabled]} 
+            onPress={handlePerformReset} 
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.link} onPress={() => setIsRecoveryMode(false)}>Back to Log In</Text>
+        </>
+      ) : (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
+            inputMode="email"
+            autoCorrect={false}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity 
+            style={[styles.button, loading && styles.buttonDisabled]} 
+            onPress={handleLogin} 
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Logging In...' : 'Log In'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
+          <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
+        </>
+      )}
+
       <StatusBar style="auto" />
     </View>
   );
