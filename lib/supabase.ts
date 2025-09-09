@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const runtimeEnv: any = (globalThis as any).__env || {};
-const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL as string) || runtimeEnv.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string) || runtimeEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // eslint-disable-next-line no-console
