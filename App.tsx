@@ -623,6 +623,14 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
+  const getLogoSource = () => {
+    if (Platform.OS === 'web') {
+      const v = Date.now();
+      return { uri: `/logo.png?v=${v}` } as any;
+    }
+    return require('./assets/logo.png');
+  };
+
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <TouchableOpacity
