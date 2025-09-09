@@ -206,26 +206,63 @@ function NutritionScreen() {
   );
 }
 
+function NoticeBanner({ message, type = 'info' }: { message: string; type?: 'info' | 'success' | 'error' }) {
+  if (!message) return null as any;
+  const background = type === 'success' ? '#E7F6EC' : type === 'error' ? '#FDECEC' : '#F3F4F6';
+  const color = type === 'success' ? '#0F5132' : type === 'error' ? '#842029' : '#111827';
+  return (
+    <View style={{ backgroundColor: background, padding: 12, borderRadius: 8, marginBottom: 12 }}>
+      <Text style={{ color }}>{message}</Text>
+    </View>
+  );
+}
+
+function parseAuthMessageFromUrl(): { banner: string; type: 'success' | 'error' | 'info' } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    const type = params.get('type');
+    if (type === 'signup') {
+      return { banner: 'Email confirmed. You can now log in.', type: 'success' };
+    }
+    if (type === 'recovery') {
+      return { banner: 'Password reset link opened. Set a new password via the link sent to your email.', type: 'info' };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function SignUpScreen({ navigation, onAuth }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
 
   const handleSignUp = async () => {
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password;
+    if (!trimmedEmail || !trimmedPassword) {
+      setNotice({ text: 'Please enter an email and password.', type: 'error' });
       Alert.alert('Missing info', 'Please enter an email and password.');
       return;
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const redirect = typeof window !== 'undefined' ? `${window.location.origin}/?type=signup` : undefined;
+      const { error } = await supabase.auth.signUp({ email: trimmedEmail, password: trimmedPassword, options: { emailRedirectTo: redirect } as any });
       if (error) {
+        setNotice({ text: error.message, type: 'error' });
         Alert.alert('Sign up failed', error.message);
       } else {
+        setNotice({ text: 'We sent a confirmation email. Please check your inbox and then return to log in.', type: 'success' });
         Alert.alert('Success', 'Check your email to confirm your account, then log in.');
         navigation.navigate('Login');
       }
     } catch (err) {
+      setNotice({ text: 'Unexpected error creating your account.', type: 'error' });
       Alert.alert('Error', 'Unexpected error creating your account.');
     } finally {
       setLoading(false);
@@ -238,6 +275,7 @@ function SignUpScreen({ navigation, onAuth }: any) {
         source={require('./assets/alli-logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
+      {notice && <NoticeBanner message={notice.text} type={notice.type} />}
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -273,23 +311,35 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    const msg = parseAuthMessageFromUrl();
+    if (msg) setNotice({ text: msg.banner, type: msg.type });
+  }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password;
+    if (!trimmedEmail || !trimmedPassword) {
+      setNotice({ text: 'Please enter an email and password.', type: 'error' });
       Alert.alert('Missing info', 'Please enter an email and password.');
       return;
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: trimmedPassword });
       if (error || !data.session) {
+        setNotice({ text: error?.message || 'Email or password is incorrect.', type: 'error' });
         Alert.alert('Invalid credentials', error?.message || 'Email or password is incorrect.');
       } else {
         await AsyncStorage.setItem('token', data.session.access_token);
+        setNotice({ text: 'Logged in successfully.', type: 'success' });
         onAuth();
         Alert.alert('Success', 'Logged in!');
       }
     } catch (err) {
+      setNotice({ text: 'Unexpected error logging in.', type: 'error' });
       Alert.alert('Error', 'Unexpected error logging in.');
     } finally {
       setLoading(false);
@@ -297,20 +347,26 @@ function LoginScreen({ navigation, onAuth }: any) {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setNotice({ text: 'Please enter your email above first, then tap Forgot Password again.', type: 'info' });
       Alert.alert('Enter email', 'Please enter your email above first, then tap Forgot Password again.');
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const redirect = typeof window !== 'undefined' ? `${window.location.origin}/?type=recovery` : undefined;
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: redirect,
       });
       if (error) {
+        setNotice({ text: error.message, type: 'error' });
         Alert.alert('Reset failed', error.message);
       } else {
-        Alert.alert('Password reset', `We sent a reset link to ${email}.`);
+        setNotice({ text: `We sent a reset link to ${trimmedEmail}. Check your inbox.`, type: 'success' });
+        Alert.alert('Password reset', `We sent a reset link to ${trimmedEmail}.`);
       }
     } catch (err) {
+      setNotice({ text: 'Unexpected error requesting password reset.', type: 'error' });
       Alert.alert('Error', 'Unexpected error requesting password reset.');
     }
   };
@@ -321,6 +377,7 @@ function LoginScreen({ navigation, onAuth }: any) {
         source={require('./assets/alli-logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
+      {notice && <NoticeBanner message={notice.text} type={notice.type} />}
       <TextInput
         style={styles.input}
         placeholder="Email"
