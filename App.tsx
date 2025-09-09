@@ -184,7 +184,9 @@ function NutritionScreen() {
         onChangeText={setCalories}
         keyboardType="numeric"
       />
-      <Button title="Add Food" onPress={addFood} color="#B9A68D" />
+      <TouchableOpacity style={styles.button} onPress={addFood}>
+        <Text style={styles.buttonText}>Add Food</Text>
+      </TouchableOpacity>
       <View style={{ marginTop: 20 }}>
         <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Food Log:</Text>
         {log.length === 0 ? (
@@ -250,12 +252,15 @@ function SignUpScreen({ navigation, onAuth }: any) {
         value={password}
         onChangeText={setPassword}
       />
-      <Button 
-        title={loading ? 'Signing Up...' : 'Sign Up'} 
+      <TouchableOpacity 
+        style={[styles.button, loading && styles.buttonDisabled]} 
         onPress={handleSignUp} 
         disabled={loading}
-        color="#B9A68D"
-      />
+      >
+        <Text style={styles.buttonText}>
+          {loading ? 'Signing Up...' : 'Sign Up'}
+        </Text>
+      </TouchableOpacity>
       <Text style={styles.link} onPress={() => navigation.navigate('Login')}>Already have an account? Log In</Text>
       <StatusBar style="auto" />
     </View>
@@ -310,12 +315,15 @@ function LoginScreen({ navigation, onAuth }: any) {
         value={password}
         onChangeText={setPassword}
       />
-      <Button 
-        title={loading ? 'Logging In...' : 'Log In'} 
+      <TouchableOpacity 
+        style={[styles.button, loading && styles.buttonDisabled]} 
         onPress={handleLogin} 
         disabled={loading}
-        color="#B9A68D"
-      />
+      >
+        <Text style={styles.buttonText}>
+          {loading ? 'Logging In...' : 'Log In'}
+        </Text>
+      </TouchableOpacity>
       <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
       <StatusBar style="auto" />
     </View>
@@ -339,7 +347,9 @@ function AccountScreen({ onLogout }: any) {
     <View style={styles.centered}>
       <Text style={[styles.title, { color: '#B9A68D' }]}>Account</Text>
       <Text>{email}</Text>
-      <Button title="Log Out" onPress={onLogout} />
+      <TouchableOpacity style={styles.button} onPress={onLogout}>
+        <Text style={styles.buttonText}>Log Out</Text>
+      </TouchableOpacity>
       <StatusBar style="auto" />
     </View>
   );
@@ -547,6 +557,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 15,
     backgroundColor: 'white',
+  },
+  button: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#B9A68D',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   link: {
     color: '#B9A68D',
