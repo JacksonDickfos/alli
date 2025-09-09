@@ -272,7 +272,7 @@ function SignUpScreen({ navigation, onAuth }: any) {
   return (
     <View style={styles.authContainer}>
       <Image
-        source={require('./assets/alli-logo.png')}
+        source={require('./assets/logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
       {notice && <NoticeBanner message={notice.text} type={notice.type} />}
@@ -427,7 +427,7 @@ function LoginScreen({ navigation, onAuth }: any) {
   return (
     <View style={styles.authContainer}>
       <Image
-        source={require('./assets/alli-logo.png')}
+        source={require('./assets/logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
       {notice && <NoticeBanner message={notice.text} type={notice.type} />}
@@ -671,7 +671,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
               }}
             >
               <Image
-                source={require('./assets/alli-logo.png')}
+                source={require('./assets/logo.png')}
                 style={{ width: 36, height: 36, resizeMode: 'contain' }}
               />
             </View>
