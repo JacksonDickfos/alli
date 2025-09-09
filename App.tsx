@@ -233,7 +233,7 @@ function SignUpScreen({ navigation, onAuth }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.authContainer}>
       <Image
         source={require('./assets/alli-logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
@@ -296,7 +296,7 @@ function LoginScreen({ navigation, onAuth }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.authContainer}>
       <Image
         source={require('./assets/alli-logo.png')}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
@@ -531,6 +531,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  authContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
