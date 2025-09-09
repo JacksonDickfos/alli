@@ -664,6 +664,6 @@ __d(function(_g,_r,i,_a,m,e,d){var r=_r(d[0]);Object.defineProperty(e,"__esModul
 __d(function(a,s,t,d,e,i,c){e.exports={uri:"/assets/assets/alli-card.2126dd99487a54b84cfa4ea462959f14.png",width:1024,height:1024}},562,[]);
 __d(function(g,r,i,a,m,e,d){m.exports={uri:"/assets/assets/nutrition-card.dec7fd80cf68333b1dc361e4c1c6bccd.png",width:800,height:450}},563,[]);
 __d(function(g,r,i,a,m,e,d){m.exports={uri:"/assets/assets/goals-card.4567b7dbf01c901371d11bcb53110d23.png",width:2e3,height:1333}},564,[]);
-__d(function(s,t,a,e,i,f,o){i.exports={uri:"/assets/assets/alli-logo.bf3754a90f8bf45341855335cd0ea24c.png",width:1024,height:1024}},565,[]);
+__d(function(d,e,s,a,t,f,i){t.exports={uri:"/assets/assets/alli-logo.ad185edd041e1eadfd2fd26ed1a6dff5.png",width:1024,height:1024}},565,[]);
 __r(4);
 __r(0);
