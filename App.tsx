@@ -626,7 +626,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   const getLogoSource = () => {
     if (Platform.OS === 'web') {
       const v = Date.now();
-      return { uri: `/logo.png?v=${v}` } as any;
+      return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
     }
     return require('./assets/logo.png');
   };
@@ -693,6 +693,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -713,9 +714,29 @@ export default function App() {
       setIsLoggedIn(!!session);
     });
 
+    // Web-only: poll for new deploys and show update banner
+    let interval: any;
+    if (Platform.OS === 'web') {
+      const KEY = 'alli_meta_signature';
+      const check = async () => {
+        try {
+          const res = await fetch(`/metadata.json?ts=${Date.now()}`, { cache: 'no-store' });
+          const text = await res.text();
+          const prev = localStorage.getItem(KEY);
+          if (prev && prev !== text) {
+            setUpdateAvailable(true);
+          }
+          localStorage.setItem(KEY, text);
+        } catch {}
+      };
+      check();
+      interval = setInterval(check, 30000);
+    }
+
     return () => {
       isMounted = false;
       sub.subscription.unsubscribe();
+      if (interval) clearInterval(interval);
     };
   }, []);
 
@@ -737,17 +758,25 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isLoggedIn ? (
-          // Auth flow screens
-          <RootStack.Screen name="Auth" component={AuthStack} />
-        ) : (
-          // Main app with bottom tabs
-          <RootStack.Screen name="MainApp">
-            {() => <MainTabNavigator onLogout={handleLogout} />}
-          </RootStack.Screen>
+      <View style={{ flex: 1 }}>
+        {updateAvailable && Platform.OS === 'web' && (
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
+            <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
+            <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#B9A68D', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
+            </TouchableOpacity>
+          </View>
         )}
-      </RootStack.Navigator>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {!isLoggedIn ? (
+            <RootStack.Screen name="Auth" component={AuthStack} />
+          ) : (
+            <RootStack.Screen name="MainApp">
+              {() => <MainTabNavigator onLogout={handleLogout} />}
+            </RootStack.Screen>
+          )}
+        </RootStack.Navigator>
+      </View>
     </NavigationContainer>
   );
 }
