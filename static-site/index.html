@@ -235,19 +235,12 @@
   </div>
 
   <script>
-    // Force focus on mobile
+    // Remove preventDefault-based handlers; let iOS handle focus natively
     document.addEventListener('DOMContentLoaded', function() {
       const inputs = document.querySelectorAll('.input');
       inputs.forEach(input => {
-        input.addEventListener('touchstart', function(e) {
-          e.preventDefault();
-          this.focus();
-        });
-        
-        input.addEventListener('click', function(e) {
-          e.preventDefault();
-          this.focus();
-        });
+        // Ensure inputs are focusable
+        input.setAttribute('tabindex', '0');
       });
     });
     
