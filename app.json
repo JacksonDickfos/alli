@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "alli-nutrition-app",
+    "name": "Alli Nutrition App",
     "slug": "alli-nutrition-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -23,7 +23,16 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static",
+      "name": "Alli Nutrition App",
+      "shortName": "Alli",
+      "description": "Your personal AI nutritionist",
+      "startUrl": "/",
+      "display": "standalone",
+      "themeColor": "#B9A68D",
+      "backgroundColor": "#ffffff"
     }
   }
 }
