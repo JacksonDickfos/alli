@@ -626,7 +626,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   const getLogoSource = () => {
     if (Platform.OS === 'web') {
       const v = Date.now();
-      return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
+      return { uri: `https://alli-nu.vercel.app/favicon.ico?v=${v}` } as any;
     }
     return require('./assets/logo.png');
   };
