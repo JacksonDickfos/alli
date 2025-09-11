@@ -144,7 +144,7 @@ function HomeScreen() {
     },
   ];
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingTop: 32, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, { marginBottom: 18, fontSize: 22, alignSelf: 'flex-start', marginLeft: 24, color: '#000' }]}>Good to see you, {firstName}</Text>
         {cards.map((card, idx) => (
@@ -785,7 +785,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#FFFFFF',
   },
   buttonText: {
     color: 'white',
