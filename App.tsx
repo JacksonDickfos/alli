@@ -530,7 +530,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
           borderTopWidth: 1,
           borderTopColor: '#E5E5E5',
           height: 80,
-          paddingBottom: 10,
+          paddingBottom: 20,
         },
         tabBarActiveTintColor: '#B9A68D',
         tabBarInactiveTintColor: '#999',
