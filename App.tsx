@@ -123,7 +123,7 @@ function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 88 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 100 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: '#B9A68D', marginBottom: 30 }]}>Welcome to Alli</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -311,7 +311,7 @@ function NutritionScreen() {
   const totals = getTotalMacros();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 88 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 100 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: '#B9A68D', marginBottom: 20 }]}>Nutrition Tracker</Text>
         
@@ -523,9 +523,9 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
           bottom: 0,
           left: 0,
           right: 0,
-          height: 88,
-          paddingBottom: 34,
-          paddingTop: 8,
+          height: 100,
+          paddingBottom: 20,
+          paddingTop: 12,
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E5',
@@ -1002,7 +1002,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   authContainer: {
     flex: 1,
@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   title: {
     fontSize: 24,
