@@ -628,7 +628,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
       const v = Date.now();
       return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
     }
-    return require('./assets/logo.png');
+    return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
   };
 
   return (
