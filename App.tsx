@@ -642,6 +642,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 5,
+          marginTop: -10,
           ...Platform.select({
             ios: {
               shadowColor: '#000',
