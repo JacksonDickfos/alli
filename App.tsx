@@ -103,7 +103,7 @@ function HomeCard({ title, image, onPress, index }: { title: string; image: any;
   const totals = getTotalMacros();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 100 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 88 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: '#B9A68D', marginBottom: 20 }]}>Nutrition Tracker</Text>
         
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 108,
   },
   authContainer: {
     flex: 1,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 108,
   },
   centered: {
     flex: 1,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 108,
   },
   title: {
     fontSize: 24,
