@@ -1,55 +1,67 @@
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Copy our custom files to web-build
-const customFiles = [
-  'icon-192.png',
-  'icon-512.png', 
-  'manifest.json',
-  'index.html'
-];
+console.log('Building PWA...');
 
-// Ensure web-build exists
-if (!fs.existsSync('web-build')) {
-  fs.mkdirSync('web-build');
-}
+// Run expo export
+execSync('npx expo export --platform web', { stdio: 'inherit' });
 
-// Copy custom files
-customFiles.forEach(file => {
-  if (fs.existsSync(`dist/${file}`)) {
-    fs.copyFileSync(`dist/${file}`, `web-build/${file}`);
-    console.log(`Copied ${file} to web-build/`);
-  }
-});
+// Copy our custom HTML template
+const customHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Alli Nutrition App</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <!-- iOS PWA meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Alli" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="theme-color" content="#B9A68D" />
+    <style id="expo-reset">
+      html, body { height: 100%; }
+      body { overflow: hidden; background: #fff; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script src="/_expo/static/js/web/index-d26b0afb848e19593cc2ec3e7c34ef2f.js"></script>
+  </body>
+</html>`;
 
-// Update the HTML file to include proper PWA meta tags
-const htmlPath = 'web-build/index.html';
-if (fs.existsSync(htmlPath)) {
-  let html = fs.readFileSync(htmlPath, 'utf8');
-  
-  // Add PWA meta tags before closing head tag
-  const pwaMeta = `
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json">
-  
-  <!-- Icons -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
-  <link rel="apple-touch-icon" href="/icon-192.png">
-  
-  <!-- PWA Meta Tags -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Alli">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#B9A68D">`;
-  
-  // Insert before closing head tag
-  html = html.replace('</head>', pwaMeta + '\n</head>');
-  
-  fs.writeFileSync(htmlPath, html);
-  console.log('Updated HTML with PWA meta tags');
-}
+// Write custom HTML
+fs.writeFileSync('dist/index.html', customHtml);
+
+// Copy manifest
+const manifest = {
+  "name": "Alli Nutrition App",
+  "short_name": "Alli",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#B9A68D",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png", 
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+};
+
+fs.writeFileSync('dist/manifest.json', JSON.stringify(manifest, null, 2));
 
 console.log('PWA build complete!');
