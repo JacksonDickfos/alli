@@ -27,6 +27,7 @@
       "permissions": ["CAMERA", "WRITE_EXTERNAL_STORAGE"]
     },
     "web": {
+      "template": "./web/index.html",
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
       "output": "single"
