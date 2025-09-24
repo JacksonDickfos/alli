@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Create a simple working HTML file
+cat > dist/index.html << 'HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,3 +139,6 @@
     </script>
 </body>
 </html>
+HTML
+
+echo "Simple working app created!"
