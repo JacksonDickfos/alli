@@ -68,15 +68,41 @@ cat > dist/index.html << 'HTML'
       </div>
     </div>
 
-    <div id="screen-alli" class="screen hidden">
-      <div class="card"><div class="title">Alli (AI Chatbot)</div><div class="muted">Coming soon.</div></div>
+    
+<div id="screen-alli" class="screen hidden">
+  <div class="card">
+    <div class="title">Alli (AI Chatbot)</div>
+    <div id="alliLog" class="muted" style="min-height:60px;margin-bottom:8px;"></div>
+    <input id="alliInput" placeholder="Ask Alli anything..." style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;" />
+    <button id="alliSend" class="button">Send</button>
+  </div>
+</div>
+
+    
+<div id="screen-goals" class="screen hidden">
+  <div class="card">
+    <div class="title">Goals</div>
+    <div class="muted" style="margin-bottom:8px">Set your daily targets</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><div class="muted">Calories</div><input id="gCal" type="number" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px" placeholder="2000"/></div>
+      <div><div class="muted">Protein (g)</div><input id="gPro" type="number" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px" placeholder="120"/></div>
+      <div><div class="muted">Carbs (g)</div><input id="gCar" type="number" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px" placeholder="220"/></div>
+      <div><div class="muted">Fat (g)</div><input id="gFat" type="number" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px" placeholder="60"/></div>
     </div>
-    <div id="screen-goals" class="screen hidden">
-      <div class="card"><div class="title">Goals</div><div class="muted">Set your nutrition goals (coming soon).</div></div>
-    </div>
-    <div id="screen-account" class="screen hidden">
-      <div class="card"><div class="title">Account</div><div class="muted">Profile & settings (coming soon).</div></div>
-    </div>
+    <button id="saveGoals" class="button" style="margin-top:12px">Save Goals</button>
+    <div id="goalsSaved" class="muted" style="margin-top:8px;display:none">Saved ✓</div>
+  </div>
+</div>
+
+    
+<div id="screen-account" class="screen hidden">
+  <div class="card">
+    <div class="title">Account</div>
+    <div class="muted" id="acctInfo">Logged in (demo)</div>
+    <button id="logoutBtn" class="button" style="margin-top:12px">Log out</button>
+  </div>
+</div>
+
   </div>
 
   <div class="nav">
@@ -147,6 +173,57 @@ cat > dist/index.html << 'HTML'
       updateTotals();
     }
   </script>
+
+  <script>
+    (function(){
+      const log = () => document.getElementById('alliLog');
+      const input = () => document.getElementById('alliInput');
+      function addLine(text, who){
+        const div = document.createElement('div');
+        div.style.margin = '6px 0';
+        div.innerHTML = (who==='you'?'You: ':'Alli: ') + text;
+        log().appendChild(div);
+      }
+      function reply(q){
+        if(/protein/i.test(q)) return 'Aim for 1.6–2.2g/kg daily. Want me to set a goal?';
+        if(/cal/i.test(q)) return 'A common starting point is TDEE - 10–20% for fat loss. I can help you estimate.';
+        if(/carb|fat/i.test(q)) return 'Balance macros to support your goals; we can start with 25/45/30 P/C/F.';
+        return 'I\'m here to help with calories, macros, and habits.';
+      }
+      document.addEventListener('click', (e)=>{
+        const t = e.target; if(!t || !('id' in t)) return;
+        if(t.id==='alliSend'){
+          const q = (input().value||'').trim(); if(!q) return;
+          addLine(q,'you'); input().value='';
+          setTimeout(()=> addLine(reply(q),'alli'), 400);
+        }
+      });
+    })();
+
+    (function(){
+      const ids = ['gCal','gPro','gCar','gFat'];
+      function save(){
+        const data = Object.fromEntries(ids.map(id=>[id, document.getElementById(id).value]));
+        localStorage.setItem('alli_goals', JSON.stringify(data));
+        const n = document.getElementById('goalsSaved'); if(n){ n.style.display='block'; setTimeout(()=> n.style.display='none', 1200); }
+      }
+      function load(){
+        try { const d = JSON.parse(localStorage.getItem('alli_goals')||'{}'); ids.forEach(id=>{ if(d[id]) document.getElementById(id).value = d[id]; }); } catch{}
+      }
+      document.addEventListener('click', (e)=>{ const t=e.target; if(t&&t.id==='saveGoals') save(); });
+      document.addEventListener('DOMContentLoaded', load);
+    })();
+
+    (function(){
+      document.addEventListener('click', (e)=>{
+        const t=e.target; if(t&&t.id==='logoutBtn'){
+          alert('Logged out (demo).');
+          show('home');
+        }
+      });
+    })();
+  </script>
+
 </body>
 </html>
 HTML
