@@ -37,6 +37,7 @@ function HomeCard({ title, image, onPress, index }: { title: string; image: any;
     setIsLoggedIn(true);
     setLoading(false);
   }, []);
+
   const takePicture = async () => {
     if (cameraPermission === false) {
       Alert.alert('Permission Required', 'Camera permission is required to take food photos.');
@@ -103,7 +104,7 @@ function HomeCard({ title, image, onPress, index }: { title: string; image: any;
   const totals = getTotalMacros();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 88 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 100 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: '#B9A68D', marginBottom: 20 }]}>Nutrition Tracker</Text>
         
@@ -219,9 +220,204 @@ function AlliTabBarButton({ children, onPress }: { children: React.ReactNode; on
   const pulse = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    setIsLoggedIn(true);
-    setLoading(false);
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        RNAnimated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
+  const getLogoSource = () => {
+    if (Platform.OS === 'web') {
+      const v = Date.now();
+      return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
+    }
+    return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
+  };
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <TouchableOpacity
+        onPress={onPress}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 5,
+          marginTop: -20,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 8,
+            },
+          }),
+        }}
+      >
+        <RNAnimated.View style={{ transform: [{ scale }], opacity }}>
+          <LinearGradient
+            colors={[ '#4F8EF7', '#8A2BE2', '#FF3B30' ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image
+                source={getLogoSource()}
+                style={{ width: 36, height: 36, resizeMode: 'contain' }}
+              />
+            </View>
+          </LinearGradient>
+        </RNAnimated.View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Props type for AlliTabBarButton
+type AlliTabBarButtonProps = {
+  children: React.ReactNode;
+  onPress: () => void;
+};
+
+function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarStyle: {
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 100,
+          paddingBottom: 40,
+          paddingTop: 12,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E5E5',
+          height: 80,
+          paddingBottom: 40,
+        },
+        tabBarActiveTintColor: '#B9A68D',
+        tabBarInactiveTintColor: '#999',
+        headerShown: false,
+      }}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Nutrition"
+        component={NutritionScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="nutrition" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Alli"
+        component={AlliScreen}
+        options={{
+          tabBarButton: (props) => <AlliTabBarButton {...props} />,
+        }}
+      />
+      <Tab.Screen
+        name="Goals"
+        component={GoalsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flag" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+        initialParams={{ onLogout }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function NoticeBanner({ message, type = 'info' }: { message: string; type?: 'info' | 'success' | 'error' }) {
+  if (!message) return null as any;
+  const background = type === 'success' ? '#E7F6EC' : type === 'error' ? '#FDECEC' : '#F3F4F6';
+  const color = type === 'success' ? '#0F5132' : type === 'error' ? '#842029' : '#111827';
+  return (
+    <View style={{ backgroundColor: background, padding: 12, borderRadius: 8, marginBottom: 12 }}>
+      <Text style={{ color }}>{message}</Text>
+    </View>
+  );
+}
+
+function parseAuthMessageFromUrl(): { banner: string; type: 'success' | 'error' | 'info' } | null {
+  if (Platform.OS !== 'web') return null;
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const type = urlParams.get('type');
+  const message = urlParams.get('message');
+  
+  if (type && message) {
+    return { banner: decodeURIComponent(message), type: type as 'success' | 'error' | 'info' };
+  }
+  return null;
+}
+
+function LoginScreen({ onAuth }: { onAuth: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [banner, setBanner] = useState<{ banner: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    const authMessage = parseAuthMessageFromUrl();
+    if (authMessage) {
+      setBanner(authMessage);
+    }
   }, []);
+
   const getLogoSource = () => {
     if (Platform.OS === 'web') {
       const v = Date.now();
@@ -507,9 +703,50 @@ export default function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(true);
-    setLoading(false);
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        setIsLoggedIn(!!data.session);
+      } catch {
+        if (!isMounted) return;
+        setIsLoggedIn(false);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    // Web-only: poll for new deploys and show update banner
+    let interval: any;
+    if (Platform.OS === 'web') {
+      const KEY = 'alli_meta_signature';
+      const check = async () => {
+        try {
+          const res = await fetch(`/metadata.json?ts=${Date.now()}`, { cache: 'no-store' });
+          const text = await res.text();
+          const prev = localStorage.getItem(KEY);
+          if (prev && prev !== text) {
+            setUpdateAvailable(true);
+          }
+          localStorage.setItem(KEY, text);
+        } catch {}
+      };
+      check();
+      interval = setInterval(check, 30000);
+    }
+
+    return () => {
+      isMounted = false;
+      sub.subscription.unsubscribe();
+      if (interval) clearInterval(interval);
+    };
   }, []);
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
     try { await supabase.auth.signOut(); } catch {}
@@ -558,7 +795,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   authContainer: {
     flex: 1,
@@ -566,7 +803,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
@@ -574,7 +811,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    paddingBottom: 108,
+    paddingBottom: 120,
   },
   title: {
     fontSize: 24,
