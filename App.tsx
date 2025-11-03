@@ -1,7 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import * as Camera from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import { StyleSheet, Text, View, TextInput, Button, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
@@ -12,7 +10,18 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from './lib/supabase';
+import { AppProvider } from './contexts/AppContext';
+import HomeScreen from './screens/HomeScreen';
+import NutritionScreen from './screens/NutritionScreen';
+import AlliScreen from './screens/AlliScreen';
+import GoalsScreen from './screens/GoalsScreen';
+import GoalsOnlyScreen from './screens/GoalsOnlyScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import AccountScreen from './screens/AccountScreen';
+import MenuScreen from './screens/MenuScreen';
+import ComingSoonScreen from './screens/ComingSoonScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -22,313 +31,24 @@ type RootTabParamList = {
   Home: undefined;
   Nutrition: undefined;
   Alli: undefined;
+  Plan: undefined;
+  Menu: undefined;
   Goals: undefined;
   Account: undefined;
 };
 
-// HomeCard component with animation
-function HomeCard({ title, image, onPress, index }: { title: string; image: any; onPress: () => void; index: number }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const pressAnim = useRef(new Animated.Value(1)).current;
-  const [pressed, setPressed] = React.useState(false);
-  
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        delay: index * 120,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        delay: index * 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, scaleAnim, index]);
+// Legacy components removed - using new screen components
 
-  const handlePressIn = () => {
-    setPressed(true);
-    Animated.spring(pressAnim, {
-      toValue: 0.95,
-      friction: 8,
-      useNativeDriver: true,
-    }).start();
-  };
+// Helper function for logo source
+const getLogoSource = () => {
+  if (Platform.OS === 'web') {
+    const v = Date.now();
+    return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
+  }
+  return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
+};
 
-  const handlePressOut = () => {
-    setPressed(false);
-    Animated.spring(pressAnim, {
-      toValue: 1,
-      friction: 8,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  // Placeholder subtitles for now
-  const subtitles: { [key: string]: string } = {
-    'Alli': 'Chat with your 24/7 dietitian',
-    'Nutrition': 'Add to your food diary',
-    'Goals': 'Track and monitor your progress',
-    'Account': 'Weight preferences and medical info',
-  };
-
-  return (
-    <Animated.View style={{
-      opacity: fadeAnim,
-      transform: [{ scale: scaleAnim }, { scale: pressAnim }],
-      marginVertical: 9,
-      alignSelf: 'flex-start',
-      marginLeft: 24,
-      width: '88%',
-      height: 175,
-      borderRadius: 24,
-      overflow: 'hidden',
-      backgroundColor: '#fff',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 16 },
-          shadowOpacity: 0.35,
-          shadowRadius: 32,
-        },
-        android: {
-          elevation: 24,
-        },
-      }),
-    }}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={{ flex: 1 }}
-        activeOpacity={0.8}
-      >
-        <Image source={image} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
-        <View style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: 16,
-        }}>
-          <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginBottom: 4 }}>{title}</Text>
-          <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>{subtitles[title]}</Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-function HomeScreen() {
-  const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
-  // Placeholder for first name, replace with real user data if available
-  const firstName = 'Alli';
-  const cards = [
-    {
-      title: 'Alli',
-      image: require('./assets/alli-card.png'),
-      onPress: () => navigation.navigate('Alli'),
-    },
-    {
-      title: 'Nutrition',
-      image: require('./assets/nutrition-card.png'),
-      onPress: () => navigation.navigate('Nutrition'),
-    },
-    {
-      title: 'Goals',
-      image: require('./assets/goals-card.png'),
-      onPress: () => navigation.navigate('Goals'),
-    },
-  ];
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingTop: 32, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.title, { marginBottom: 18, fontSize: 22, alignSelf: 'flex-start', marginLeft: 24, color: '#000' }]}>Good to see you, {firstName}</Text>
-        {cards.map((card, idx) => (
-          <HomeCard key={card.title} title={card.title} image={card.image} onPress={card.onPress} index={idx} />
-        ))}
-        <StatusBar style="auto" />
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function NutritionScreen() {
-  const [foodLog, setFoodLog] = useState<Array<{
-    id: string;
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    fiber: number;
-    sugar: number;
-    serving_size: string;
-    confidence: number;
-    imageUri?: string;
-  }>>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setCameraPermission(status === "granted");
-    })();
-  }, []);
-
-  const takePicture = async () => {
-    if (cameraPermission === false) {
-      Alert.alert("Permission Required", "Camera permission is required to take food photos.");
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await analyzeAndLogFood(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Camera error:", error);
-      Alert.alert("Error", "Failed to take picture. Please try again.");
-    }
-  };
-
-  const analyzeAndLogFood = async (imageUri: string) => {
-    setIsAnalyzing(true);
-    try {
-      // Simulate AI analysis with realistic food data
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const mockAnalysis = {
-        id: Date.now().toString(),
-        name: "Mixed Salad with Chicken",
-        calories: 320,
-        protein: 28,
-        carbs: 15,
-        fat: 18,
-        fiber: 4,
-        sugar: 8,
-        serving_size: "1 bowl",
-        confidence: 0.87,
-        imageUri
-      };
-      
-      setFoodLog(prev => [mockAnalysis, ...prev]);
-      Alert.alert("Food Logged!", `Analyzed: ${mockAnalysis.name}\nCalories: ${mockAnalysis.calories}\nConfidence: ${Math.round(mockAnalysis.confidence * 100)}%`);
-    } catch (error) {
-      console.error("Analysis error:", error);
-      Alert.alert("Error", "Failed to analyze food. Please try again.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const removeFood = (id: string) => {
-    setFoodLog(prev => prev.filter(item => item.id !== id));
-  };
-
-  const totals = foodLog.reduce((acc, item) => ({
-    calories: acc.calories + item.calories,
-    protein: acc.protein + item.protein,
-    carbs: acc.carbs + item.carbs,
-    fat: acc.fat + item.fat,
-    fiber: acc.fiber + item.fiber,
-    sugar: acc.sugar + item.sugar,
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, { color: "#B9A68D", marginBottom: 20 }]}>Nutrition</Text>
-        
-        {/* Food Picture Analyzer */}
-        <View style={[styles.card, { marginBottom: 20 }]}>
-          <Text style={[styles.subtitle, { color: "#B9A68D", marginBottom: 15 }]}>Food Picture Analyzer</Text>
-          <Text style={[styles.description, { marginBottom: 20 }]}>
-            Take a photo of your food and get instant macronutrient analysis
-          </Text>
-          
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: isAnalyzing ? "#ccc" : "#B9A68D" }]}
-            onPress={takePicture}
-            disabled={isAnalyzing}
-          >
-            <Text style={styles.buttonText}>
-              {isAnalyzing ? "Analyzing..." : "Take Food Photo"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Daily Totals */}
-        <View style={[styles.card, { marginBottom: 20 }]}>
-          <Text style={[styles.subtitle, { color: "#B9A68D", marginBottom: 15 }]}>Today's Totals</Text>
-          <View style={styles.macroGrid}>
-            <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>{Math.round(totals.calories)}</Text>
-              <Text style={styles.macroLabel}>Calories</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>{Math.round(totals.protein)}g</Text>
-              <Text style={styles.macroLabel}>Protein</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>{Math.round(totals.carbs)}g</Text>
-              <Text style={styles.macroLabel}>Carbs</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>{Math.round(totals.fat)}g</Text>
-              <Text style={styles.macroLabel}>Fat</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Food Log */}
-        <View style={[styles.card, { marginBottom: 20 }]}>
-          <Text style={[styles.subtitle, { color: "#B9A68D", marginBottom: 15 }]}>Food Log</Text>
-          {foodLog.length === 0 ? (
-            <Text style={styles.emptyText}>No foods logged yet. Take a photo to get started!</Text>
-          ) : (
-            foodLog.map((item) => (
-              <View key={item.id} style={styles.foodItem}>
-                <View style={styles.foodItemContent}>
-                  {item.imageUri && (
-                    <Image source={{ uri: item.imageUri }} style={styles.foodImage} />
-                  )}
-                  <View style={styles.foodDetails}>
-                    <Text style={styles.foodName}>{item.name}</Text>
-                    <Text style={styles.foodServing}>{item.serving_size}</Text>
-                    <Text style={styles.foodCalories}>{item.calories} cal</Text>
-                    <View style={styles.foodMacros}>
-                      <Text style={styles.macroText}>P: {item.protein}g</Text>
-                      <Text style={styles.macroText}>C: {item.carbs}g</Text>
-                      <Text style={styles.macroText}>F: {item.fat}g</Text>
-                    </View>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.removeButton} onPress={() => removeFood(item.id)}>
-                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
-      <StatusBar style="auto" />
-    </SafeAreaView>
-  );
-}
+// Legacy NutritionScreen removed - using new NutritionScreen component
 function NoticeBanner({ message, type = 'info' }: { message: string; type?: 'info' | 'success' | 'error' }) {
   if (!message) return null as any;
   const background = type === 'success' ? '#E7F6EC' : type === 'error' ? '#FDECEC' : '#F3F4F6';
@@ -374,17 +94,25 @@ function SignUpScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const redirect = typeof window !== 'undefined' ? `${window.location.origin}/?type=signup` : undefined;
-      const { error } = await supabase.auth.signUp({ email: trimmedEmail, password: trimmedPassword, options: { emailRedirectTo: redirect } as any });
+      const { data, error } = await supabase.auth.signUp({ 
+        email: trimmedEmail, 
+        password: trimmedPassword 
+      });
+      
       if (error) {
+        console.error('Signup error:', error);
         setNotice({ text: error.message, type: 'error' });
         Alert.alert('Sign up failed', error.message);
-      } else {
-        setNotice({ text: 'We sent a confirmation email. Please check your inbox and then return to log in.', type: 'success' });
-        Alert.alert('Success', 'Check your email to confirm your account, then log in.');
+      } else if (data.user) {
+        setNotice({ text: 'Account created successfully! You can now log in.', type: 'success' });
+        Alert.alert('Success', 'Account created! You can now log in.');
         navigation.navigate('Login');
+      } else {
+        setNotice({ text: 'Unexpected error creating your account.', type: 'error' });
+        Alert.alert('Error', 'Unexpected error creating your account.');
       }
     } catch (err) {
+      console.error('Signup catch error:', err);
       setNotice({ text: 'Unexpected error creating your account.', type: 'error' });
       Alert.alert('Error', 'Unexpected error creating your account.');
     } finally {
@@ -438,6 +166,9 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState<{email: string, password: string} | null>(null);
+  const [isDevMode, setIsDevMode] = useState(__DEV__);
 
   useEffect(() => {
     const msg = parseAuthMessageFromUrl();
@@ -454,6 +185,140 @@ function LoginScreen({ navigation, onAuth }: any) {
       }
     }
   }, []);
+
+  useEffect(() => {
+    // Check if biometric authentication is available
+    const checkBiometric = async () => {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        
+        console.log('Biometric check:', { hasHardware, isEnrolled, supportedTypes });
+        
+        // Check specifically for Face ID (type 2) or Touch ID (type 1)
+        const hasFaceID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        const hasTouchID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+        
+        if (hasHardware && isEnrolled && (hasFaceID || hasTouchID)) {
+          setBiometricAvailable(true);
+          console.log('✅ Biometric authentication available:', hasFaceID ? 'Face ID' : 'Touch ID');
+          
+          // Load saved credentials
+          const savedEmail = await AsyncStorage.getItem('savedEmail');
+          const savedPassword = await AsyncStorage.getItem('savedPassword');
+          if (savedEmail && savedPassword) {
+            setSavedCredentials({ email: savedEmail, password: savedPassword });
+            console.log('✅ Saved credentials found for biometric login');
+          }
+        } else {
+          // Even if biometric isn't available, load saved credentials for dev mode
+          const savedEmail = await AsyncStorage.getItem('savedEmail');
+          const savedPassword = await AsyncStorage.getItem('savedPassword');
+          if (savedEmail && savedPassword) {
+            setSavedCredentials({ email: savedEmail, password: savedPassword });
+            console.log('✅ Saved credentials found (biometric not available, but available for quick login)');
+          }
+          console.log('❌ Biometric authentication not available');
+        }
+      } catch (error) {
+        console.log('❌ Biometric check error:', error);
+      }
+    };
+    
+    checkBiometric();
+  }, []);
+
+  const handleQuickLogin = async () => {
+    if (!savedCredentials) {
+      setNotice({ text: 'No saved credentials found. Please log in manually first.', type: 'error' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Quick login without biometric - just use saved credentials
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: savedCredentials.email, 
+        password: savedCredentials.password 
+      });
+      
+      if (error) {
+        console.error('Quick login error:', error);
+        setNotice({ text: error.message, type: 'error' });
+        Alert.alert('Login failed', error.message);
+      } else if (data.session) {
+        await AsyncStorage.setItem('token', data.session.access_token);
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        setNotice({ text: 'Quick login successful!', type: 'success' });
+        onAuth();
+      }
+    } catch (error: any) {
+      console.error('Quick login error:', error);
+      setNotice({ text: error.message || 'Quick login failed.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFaceIDLogin = async () => {
+    if (!savedCredentials) {
+      setNotice({ text: 'No saved credentials found. Please log in manually first.', type: 'error' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // On simulator, try quick login first (faster, no biometric needed)
+      // But still allow Face ID if it's available
+      if (Platform.OS === 'ios' && __DEV__ && !biometricAvailable) {
+        console.log('⚠️ Simulator detected without biometric - using quick login');
+        // Use quick login instead
+        await handleQuickLogin();
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Use Face ID to log in to Alli',
+        fallbackLabel: 'Use Password Instead',
+        disableDeviceFallback: false, // Allow fallback on simulator
+        requireBiometrics: false, // Don't require on simulator
+      });
+
+      if (result.success) {
+        // Use saved credentials to log in
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email: savedCredentials.email, 
+          password: savedCredentials.password 
+        });
+        
+        if (error) {
+          console.error('Face ID login error:', error);
+          setNotice({ text: error.message, type: 'error' });
+          Alert.alert('Login failed', error.message);
+        } else if (data.session) {
+          await AsyncStorage.setItem('token', data.session.access_token);
+          await AsyncStorage.setItem('isLoggedIn', 'true');
+          setNotice({ text: 'Logged in with Face ID successfully!', type: 'success' });
+          onAuth();
+          Alert.alert('Success', 'Logged in with Face ID!');
+        }
+      } else {
+        setNotice({ text: 'Face ID authentication cancelled or failed.', type: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Face ID error:', error);
+      // If biometric fails, try quick login as fallback
+      if (error.message?.includes('not available') || error.message?.includes('simulator')) {
+        console.log('⚠️ Biometric not available, falling back to quick login');
+        await handleQuickLogin();
+      } else {
+        setNotice({ text: 'Face ID authentication failed.', type: 'error' });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePerformReset = async () => {
     const p1 = newPassword.trim();
@@ -505,16 +370,25 @@ function LoginScreen({ navigation, onAuth }: any) {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: trimmedPassword });
-      if (error || !data.session) {
-        setNotice({ text: error?.message || 'Email or password is incorrect.', type: 'error' });
-        Alert.alert('Invalid credentials', error?.message || 'Email or password is incorrect.');
-      } else {
+      if (error) {
+        console.error('Login error:', error);
+        setNotice({ text: error.message, type: 'error' });
+        Alert.alert('Login failed', error.message);
+      } else if (data.session) {
         await AsyncStorage.setItem('token', data.session.access_token);
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        // Save credentials for Face ID
+        await AsyncStorage.setItem('savedEmail', trimmedEmail);
+        await AsyncStorage.setItem('savedPassword', trimmedPassword);
         setNotice({ text: 'Logged in successfully.', type: 'success' });
         onAuth();
         Alert.alert('Success', 'Logged in!');
+      } else {
+        setNotice({ text: 'Unexpected error logging in.', type: 'error' });
+        Alert.alert('Error', 'Unexpected error logging in.');
       }
     } catch (err) {
+      console.error('Login catch error:', err);
       setNotice({ text: 'Unexpected error logging in.', type: 'error' });
       Alert.alert('Error', 'Unexpected error logging in.');
     } finally {
@@ -609,6 +483,35 @@ function LoginScreen({ navigation, onAuth }: any) {
               {loading ? 'Logging In...' : 'Log In'}
             </Text>
           </TouchableOpacity>
+          
+          {biometricAvailable && savedCredentials && (
+            <TouchableOpacity 
+              style={[styles.faceIdButton, loading && styles.buttonDisabled]} 
+              onPress={handleFaceIDLogin} 
+              disabled={loading}
+            >
+              <Ionicons name="face-id" size={24} color="white" style={{ marginRight: 8 }} />
+              <Text style={styles.buttonText}>
+                {loading ? 'Authenticating...' : 'Log In with Face ID'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Quick Login button - shows in dev mode (simulator) when credentials are saved */}
+          {/* Shows even if Face ID is available, so you have both options in dev */}
+          {isDevMode && savedCredentials && (
+            <TouchableOpacity 
+              style={[styles.quickLoginButton, loading && styles.buttonDisabled]} 
+              onPress={handleQuickLogin} 
+              disabled={loading}
+            >
+              <Ionicons name="flash" size={24} color="white" style={{ marginRight: 8 }} />
+              <Text style={styles.buttonText}>
+                {loading ? 'Logging in...' : 'Quick Login (Simulator)'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          
           <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
           <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
         </>
@@ -619,30 +522,7 @@ function LoginScreen({ navigation, onAuth }: any) {
   );
 }
 
-function AccountScreen({ onLogout }: any) {
-  const [email, setEmail] = useState('');
-
-  useEffect(() => {
-    // In a real app, decode the JWT or fetch user profile
-    AsyncStorage.getItem('token').then(token => {
-      if (token) {
-        // For demo, just show token exists
-        setEmail('Logged in');
-      }
-    });
-  }, []);
-
-  return (
-    <View style={styles.centered}>
-      <Text style={[styles.title, { color: '#B9A68D' }]}>Account</Text>
-      <Text>{email}</Text>
-      <TouchableOpacity style={styles.button} onPress={onLogout}>
-        <Text style={styles.buttonText}>Log Out</Text>
-      </TouchableOpacity>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+// Legacy AccountScreen removed - using new AccountScreen component
 
 function AuthStack({ onAuth }: any) {
   return (
@@ -657,67 +537,97 @@ function AuthStack({ onAuth }: any) {
   );
 }
 
-function AlliScreen() {
+// Legacy AlliScreen and GoalsScreen removed - using new screen components
+
+
+
+// Menu Stack Navigator for handling Profile and Account screens
+function MenuStackNavigator({ onLogout }: { onLogout: () => void }) {
   return (
-    <View style={styles.centered}>
-      <Text style={[styles.title, { color: '#B9A68D' }]}>Alli (AI Chatbot)</Text>
-      <Text>Conversational AI coming soon!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MenuMain" component={MenuScreen} />
+      <Stack.Screen name="Goals" component={GoalsOnlyScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Account">
+        {(props) => <AccountScreen {...props} onLogout={onLogout} />}
+      </Stack.Screen>
+    </Stack.Navigator>
   );
 }
-
-function GoalsScreen() {
-  return (
-    <View style={styles.centered}>
-      <Text style={[styles.title, { color: '#B9A68D' }]}>Goals</Text>
-      <Text>Set and track your goals here.</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
-
-
 
 // Main tab navigator component
 function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#CDC4B7',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginTop: -1, // Move text up 10px from previous 9px
+        },
         headerShown: false,
         tabBarIcon: ({ color, size, focused }) => {
+          const iconSize = size * 0.9; // Reduce by 10%
+          const iconStyle = { marginTop: -5 }; // Move icons up 5px
+          
           if (route.name === 'Home') {
-            return <Ionicons name="home" size={size} color={color} />;
+            return <MaterialCommunityIcons name="weather-sunset" size={iconSize} color={color} style={iconStyle} />;
           } else if (route.name === 'Nutrition') {
-            return <MaterialCommunityIcons name="food-apple" size={size} color={color} />;
+            return <MaterialCommunityIcons name="clipboard-text" size={iconSize} color={color} style={iconStyle} />;
           } else if (route.name === 'Alli') {
             // Icon handled by custom tabBarButton
             return null;
-          } else if (route.name === 'Goals') {
-            return <MaterialCommunityIcons name="target" size={size} color={color} />;
-          } else if (route.name === 'Account') {
-            return <FontAwesome name="user" size={size} color={color} />;
+          } else if (route.name === 'Plan') {
+            return <MaterialCommunityIcons name="silverware-fork-knife" size={iconSize} color={color} style={iconStyle} />;
+          } else if (route.name === 'Menu') {
+            return <MaterialCommunityIcons name="dots-horizontal" size={iconSize} color={color} style={iconStyle} />;
           }
           return null;
         },
         tabBarStyle: {
-          height: 70,
+          height: 80,
+          backgroundColor: '#28657A',
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Nutrition" component={NutritionScreen} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{ tabBarLabel: 'Today' }}
+      />
+      <Tab.Screen 
+        name="Nutrition" 
+        component={NutritionScreen}
+        options={{ tabBarLabel: 'Diary' }}
+      />
       <Tab.Screen
         name="Alli"
         component={AlliScreen}
         options={{
+          tabBarLabel: 'Alli',
           tabBarButton: (props) => <AlliTabBarButton {...props} />, 
         }}
       />
-      <Tab.Screen name="Goals" component={GoalsScreen} />
-      <Tab.Screen name="Account">
-        {() => <AccountScreen onLogout={onLogout} />}
+      <Tab.Screen 
+        name="Plan" 
+        component={ComingSoonScreen}
+        options={{ tabBarLabel: 'Plan' }}
+      />
+      <Tab.Screen 
+        name="Menu"
+        options={{ tabBarLabel: 'More' }}
+      >
+        {() => <MenuStackNavigator onLogout={onLogout} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -747,11 +657,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
   const getLogoSource = () => {
-    if (Platform.OS === 'web') {
-      const v = Date.now();
-      return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
-    }
-    return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
+    return require('./assets/fullname-logo.png');
   };
 
   return (
@@ -797,14 +703,15 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
                 width: 56,
                 height: 56,
                 borderRadius: 28,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#28657A',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden',
               }}
             >
               <Image
                 source={getLogoSource()}
-                style={{ width: 36, height: 36, resizeMode: 'contain' }}
+                style={{ width: 60, height: 60, resizeMode: 'cover', borderRadius: 24 }}
               />
             </View>
           </LinearGradient>
@@ -814,28 +721,152 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   );
 }
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; errorMsg?: string }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, errorMsg: undefined };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, errorMsg: error?.message || 'Unexpected error' };
+  }
+  componentDidCatch(error: any, info: any) {
+    if (typeof window !== 'undefined') {
+      (window as any).__ALLI_LAST_ERROR__ = { error, info };
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Something went wrong</Text>
+          <Text style={{ color: '#333', textAlign: 'center' }}>{this.state.errorMsg}</Text>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [bootTimedOut, setBootTimedOut] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBootTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // SMART TOKEN REFRESH: Keep you logged in AND authenticated
+  useEffect(() => {
+    const refreshInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.log('Token refresh error (non-critical):', error.message);
+          // DON'T log out - keep user logged in even if token refresh fails
+          // Only log out if it's a real authentication failure
+          if (error.message.includes('Invalid JWT') || 
+              error.message.includes('Token expired') ||
+              error.message.includes('Invalid token')) {
+            console.log('Real auth failure - but keeping user logged in for now');
+            // Don't actually log out - let them try again
+          }
+        } else if (data.session) {
+          // Token refreshed successfully - update stored token
+          await AsyncStorage.setItem('token', data.session.access_token);
+          await AsyncStorage.setItem('isLoggedIn', 'true');
+          console.log('✅ Token refreshed successfully');
+        }
+      } catch (error) {
+        console.log('Token refresh catch error (non-critical):', error);
+        // Don't log out for network errors
+      }
+    }, 4 * 60 * 1000); // Refresh every 4 minutes (tokens last 1 hour)
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
+        // BULLETPROOF AUTH: Always stay logged in unless explicitly logged out
+        const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
+        const autoLogin = process.env.EXPO_PUBLIC_AUTO_LOGIN === 'true';
+        
+        if (savedAuthState === 'true' && autoLogin) {
+          // User was logged in AND auto-login enabled, keep them logged in FOREVER
+          console.log('✅ User was logged in (auto-login enabled), keeping them logged in permanently');
+          await AsyncStorage.setItem('isLoggedIn', 'true');
+          setIsLoggedIn(true);
+          if (isMounted) setLoading(false);
+          return;
+        }
+
+        // For testing: Always start logged out unless auto-login is enabled
+        if (!autoLogin) {
+          console.log('🔒 Auto-login disabled - starting logged out for testing');
+          setIsLoggedIn(false);
+          if (isMounted) setLoading(false);
+          return;
+        }
+
+        // Only check session if auto-login is enabled and no saved state
         const { data } = await supabase.auth.getSession();
         if (!isMounted) return;
-        setIsLoggedIn(!!data.session);
-      } catch {
+        
+        if (data.session) {
+          // Found a session, save it permanently
+          await AsyncStorage.setItem('isLoggedIn', 'true');
+          await AsyncStorage.setItem('token', data.session.access_token);
+          setIsLoggedIn(true);
+        } else {
+          // No session, user needs to log in
+          setIsLoggedIn(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
         if (!isMounted) return;
-        setIsLoggedIn(false);
+        
+        // On ANY error, check saved state and keep user logged in
+        const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
+        if (savedAuthState === 'true') {
+          console.log('✅ Error occurred, but keeping user logged in');
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
+    // SMART auth state change handler - handles both login status AND authentication
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, !!session);
+      
+      if (event === 'SIGNED_IN' && session) {
+        // User signed in - save permanently
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('token', session.access_token);
+        setIsLoggedIn(true);
+        console.log('✅ User signed in - saved permanently');
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        // Token refreshed - keep logged in AND update token
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('token', session.access_token);
+        setIsLoggedIn(true);
+        console.log('✅ Token refreshed - user stays logged in');
+      } else if (event === 'SIGNED_OUT') {
+        // Only handle explicit sign out
+        console.log('User explicitly signed out');
+        await AsyncStorage.removeItem('isLoggedIn');
+        await AsyncStorage.removeItem('token');
+        setIsLoggedIn(false);
+      }
+      // NOTE: We ignore other events to keep user logged in
     });
 
     // Web-only: poll for new deploys and show update banner
@@ -866,63 +897,86 @@ export default function App() {
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('isLoggedIn');
     try { await supabase.auth.signOut(); } catch {}
     setIsLoggedIn(false);
   };
 
-  const handleAuth = () => {
+  const handleAuth = async () => {
     setIsLoggedIn(true);
+    // Save authentication state
+    try {
+      await AsyncStorage.setItem('isLoggedIn', 'true');
+    } catch (error) {
+      console.error('Error saving auth state:', error);
+    }
   };
 
-  if (loading) {
+  if (loading && !bootTimedOut) {
     return (
-      <View style={styles.centered}><Text>Loading...</Text></View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#0090A3' }}>Loading…</Text>
+      </SafeAreaView>
+    );
+  }
+  if (loading && bootTimedOut) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Still loading…</Text>
+        <Text style={{ color: '#333', textAlign: 'center' }}>If this persists, please reload the app.</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <NavigationContainer>
-      <View style={{ flex: 1 }}>
-        {updateAvailable && Platform.OS === 'web' && (
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
-            <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
-            <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#B9A68D', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
-            </TouchableOpacity>
+    <AppProvider>
+      <ErrorBoundary>
+        <NavigationContainer>
+          <View style={{ flex: 1 }}>
+            {updateAvailable && Platform.OS === 'web' && (
+              <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
+                <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
+                <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#0090A3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+              {!isLoggedIn ? (
+                <RootStack.Screen name="Auth">
+                  {() => <AuthStack onAuth={handleAuth} />}
+                </RootStack.Screen>
+              ) : (
+                <RootStack.Screen name="MainApp">
+                  {() => <MainTabNavigator onLogout={handleLogout} />}
+                </RootStack.Screen>
+              )}
+            </RootStack.Navigator>
           </View>
-        )}
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          {!isLoggedIn ? (
-            <RootStack.Screen name="Auth" component={AuthStack} />
-          ) : (
-            <RootStack.Screen name="MainApp">
-              {() => <MainTabNavigator onLogout={handleLogout} />}
-            </RootStack.Screen>
-          )}
-        </RootStack.Navigator>
-      </View>
-    </NavigationContainer>
+        </NavigationContainer>
+      </ErrorBoundary>
+    </AppProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#CDC4B7',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
   authContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#28657A',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
   centered: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#CDC4B7',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -931,7 +985,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#B9A68D',
+    color: '#0090A3',
   },
   input: {
     width: '100%',
@@ -946,7 +1000,7 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#B9A68D',
+    backgroundColor: '#0090A3',
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -955,13 +1009,38 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: '#ccc',
   },
+  quickLoginButton: {
+    backgroundColor: '#9B59B6', // Purple color to match your description
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 12,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  faceIdButton: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#6E006A',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+    flexDirection: 'row',
+  },
   buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
   link: {
-    color: '#B9A68D',
+    color: '#0090A3',
     marginTop: 15,
     textDecorationLine: 'underline',
   },

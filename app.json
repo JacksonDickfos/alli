@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Alli Nutrition App",
+    "name": "Alli",
     "slug": "alli-nutrition-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,18 +13,27 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "io.alli.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "This app needs access to camera to take photos of food for nutrition analysis."
+        "NSCameraUsageDescription": "This app needs access to camera to take photos of food for nutrition analysis.",
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to enable voice interactions with the AI assistant.",
+        "NSSpeechRecognitionUsageDescription": "This app needs access to speech recognition to transcribe your voice questions.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "io.alli.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["CAMERA", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "template": "./web/index.html",
@@ -45,6 +54,14 @@
           "photosPermission": "Allow Alli to access your photos to select food images for nutrition analysis."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a6585e07-3b20-4942-a9c8-d443e401ea33"
+      },
+      "supabaseUrl": "https://rkkoppppcxvbdzudzijw.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJra29wcHBwY3h2YmR6dWR6aWp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDExNDcsImV4cCI6MjA3NTYxNzE0N30.oLg5LsMNfuyuN3Vd_E0d1MQBQ5autzX1ZczczpthsgM"
+    },
+    "owner": "jacksondickfos"
   }
 }
