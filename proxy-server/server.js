@@ -119,15 +119,21 @@ wss.on('connection', (clientWs) => {
                 const msgType = parsed.type || 'unknown';
                 console.log('📤 Forwarding to client:', msgType);
                 
-                // Log errors with full details
+                // Log all important events for debugging
                 if (msgType === 'error') {
                   console.error('❌ OpenAI error:', JSON.stringify(parsed, null, 2));
+                } else if (msgType === 'session.created') {
+                  console.log('✅ OpenAI session.created event received');
+                  console.log('   Full message being forwarded:', messageStr.substring(0, 200));
+                } else if (msgType === 'session.updated') {
+                  console.log('✅ OpenAI session.updated event received');
                 }
                 
                 if (clientWs.readyState === WebSocket.OPEN) {
+                  console.log('   ✅ Client WebSocket is OPEN, forwarding', msgType);
                   clientWs.send(data);
                 } else {
-                  console.log('⚠️ Client WebSocket not open, cannot forward:', msgType);
+                  console.log('⚠️ Client WebSocket not open (state:', clientWs.readyState, '), cannot forward:', msgType);
                 }
               }
             } catch (parseError) {
@@ -143,7 +149,10 @@ wss.on('connection', (clientWs) => {
     // Error handler moved above - set immediately after WebSocket creation
 
     openaiWs.on('close', (code, reason) => {
-      console.log('🔌 Disconnected from OpenAI Realtime API:', code, reason?.toString());
+      console.log('🔌 Disconnected from OpenAI Realtime API - Code:', code, 'Reason:', reason?.toString());
+      if (code !== 1000) {
+        console.error('⚠️ Unexpected disconnect! Code:', code, 'Reason:', reason);
+      }
       isConnected = false;
       
       if (clientWs.readyState === WebSocket.OPEN) {

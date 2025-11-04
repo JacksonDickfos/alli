@@ -53,22 +53,23 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Alli needs access to your camera for food analysis.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Alli needs access to your microphone to enable voice interactions.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Alli needs access to speech recognition to transcribe your voice questions.</string>
+	<string>Allow Alli to access your camera to take photos of food for nutrition analysis.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Alli uses Face ID for secure and quick authentication.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Alli needs local network access to connect to the real-time AI service.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone to enable voice interactions with the AI assistant.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to save photos</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Alli needs access to your photos for food analysis.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Alli needs local network access to connect to the real-time AI service.</string>
+	<string>Allow Alli to access your photos to select food images for nutrition analysis.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app needs access to speech recognition to transcribe your voice questions.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>
+		<string>audio</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>

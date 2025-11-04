@@ -33,8 +33,8 @@ interface AlliScreenProps {
 }
 
 export default function AlliScreen({ navigation }: AlliScreenProps) {
-  // Feature flag: keep realtime OFF by default while we build it safely
-  const USE_REALTIME = false;
+  // Feature flag: enable realtime for testing
+  const USE_REALTIME = true;
   const voiceService = USE_REALTIME ? realtimeVoiceService : simpleVoiceService;
   const { state, getTodaysTotals } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,31 +68,27 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
     // Message will be added when chat is opened for the first time
   }, []);
 
-  // Setup voice service callbacks
+  // Setup voice service callbacks - run once on mount
   useEffect(() => {
     // Connect realtime on mount if enabled
     if (USE_REALTIME) {
-      realtimeVoiceService.connect({ url: 'ws://localhost:8080/realtime' }).catch(() => {});
+      // Physical iPhone on same Wi‑Fi
+      const wsUrl = 'ws://192.168.4.29:8080/realtime';
+      console.log('📱 AlliScreen: Connecting to realtime with URL:', wsUrl);
+      realtimeVoiceService.connect({ url: wsUrl }).catch((err) => {
+        console.error('❌ AlliScreen: Failed to connect to realtime:', err);
+      });
       realtimeVoiceService.setCallbacks({
         onAIResponse: (text: string) => {
-          if (showChat) {
-            setMessages(prev => {
-              const lastMessage = prev[prev.length - 1];
-              if (lastMessage && !lastMessage.isUser) {
-                return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text } : msg);
-              } else {
-                return [...prev, { id: String(Date.now()+1), text, isUser: false, timestamp: new Date(), type: 'text' }];
-              }
-            });
-          } else {
-            setMessages(prev => {
-              const lastMessage = prev[prev.length - 1];
-              if (lastMessage && !lastMessage.isUser) {
-                return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text } : msg);
-              }
+          // Always update messages - UI handles visibility
+          setMessages(prev => {
+            const lastMessage = prev[prev.length - 1];
+            if (lastMessage && !lastMessage.isUser) {
+              return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text } : msg);
+            } else {
               return [...prev, { id: String(Date.now()+1), text, isUser: false, timestamp: new Date(), type: 'text' }];
-            });
-          }
+            }
+          });
         },
         onError: (m: string) => {
           console.log('Realtime error:', m);
@@ -100,7 +96,8 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
       });
     }
     return () => { voiceService.cleanup(); };
-  }, [voiceService, USE_REALTIME, showChat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
