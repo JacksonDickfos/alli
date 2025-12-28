@@ -5,11 +5,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Node fetch fallback (node-fetch is ESM; load it dynamically if needed)
-const fetchImpl =
-  typeof fetch === 'function'
-    ? fetch
-    : (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+// Use native fetch (Node 18+)
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -142,7 +138,7 @@ app.post('/chat', async (req, res) => {
       messages: messagesWithSystem,
     };
 
-    const fwRes = await fetchImpl(FIREWORKS_ENDPOINT, {
+    const fwRes = await fetch(FIREWORKS_ENDPOINT, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -172,6 +168,12 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-}); 
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel
+module.exports = app; 

@@ -1,26 +1,23 @@
 {
-  "name": "backend",
+  "name": "alli-backend",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Alli Nutrition App Backend API",
   "dependencies": {
-    "@react-native-async-storage/async-storage": "1.21.0",
-    "@react-navigation/native": "^7.1.14",
-    "@react-navigation/native-stack": "^7.3.21",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "node-fetch": "^3.3.2",
-    "react-native-screens": "~3.29.0",
-    "react-native-safe-area-context": "4.8.2"
+    "jsonwebtoken": "^9.0.2"
   }
 }
