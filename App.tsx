@@ -12,7 +12,8 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
-import { supabase } from './lib/supabase';
+import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
+import AlliChatScreen from './components/AlliChatScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -25,6 +26,15 @@ type RootTabParamList = {
   Goals: undefined;
   Account: undefined;
 };
+
+// Shared logo helper (used by Auth screens + Tab button)
+function getLogoSource() {
+  const v = Date.now();
+  if (Platform.OS === 'web') {
+    return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
+  }
+  return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
+}
 
 // HomeCard component with animation
 function HomeCard({ title, image, onPress, index }: { title: string; image: any; onPress: () => void; index: number }) {
@@ -173,19 +183,25 @@ function NutritionScreen() {
     imageUri?: string;
   }>>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  const [cameraPermission, requestCameraPermission] = Camera.useCameraPermissions();
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setCameraPermission(status === "granted");
-    })();
+    // Best-effort permission request on mount (new expo-camera API)
+    requestCameraPermission?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const takePicture = async () => {
-    if (cameraPermission === false) {
+    if (cameraPermission?.granted === false) {
       Alert.alert("Permission Required", "Camera permission is required to take food photos.");
       return;
+    }
+    if (!cameraPermission?.granted) {
+      const res = await requestCameraPermission?.();
+      if (res && !res.granted) {
+        Alert.alert("Permission Required", "Camera permission is required to take food photos.");
+        return;
+      }
     }
 
     try {
@@ -365,6 +381,11 @@ function SignUpScreen({ navigation, onAuth }: any) {
   const [notice, setNotice] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
 
   const handleSignUp = async () => {
+    if (!isSupabaseConfigured) {
+      setNotice({ text: supabaseConfigError, type: 'error' });
+      Alert.alert('Supabase not configured', supabaseConfigError);
+      return;
+    }
     const trimmedEmail = email.trim();
     const trimmedPassword = password;
     if (!trimmedEmail || !trimmedPassword) {
@@ -374,7 +395,10 @@ function SignUpScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const redirect = typeof window !== 'undefined' ? `${window.location.origin}/?type=signup` : undefined;
+      const redirect =
+        Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).location?.origin
+          ? `${(window as any).location.origin}/?type=signup`
+          : undefined;
       const { error } = await supabase.auth.signUp({ email: trimmedEmail, password: trimmedPassword, options: { emailRedirectTo: redirect } as any });
       if (error) {
         setNotice({ text: error.message, type: 'error' });
@@ -385,8 +409,10 @@ function SignUpScreen({ navigation, onAuth }: any) {
         navigation.navigate('Login');
       }
     } catch (err) {
-      setNotice({ text: 'Unexpected error creating your account.', type: 'error' });
-      Alert.alert('Error', 'Unexpected error creating your account.');
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Supabase signUp threw:', err);
+      setNotice({ text: msg || 'Unexpected error creating your account.', type: 'error' });
+      Alert.alert('Error', msg || 'Unexpected error creating your account.');
     } finally {
       setLoading(false);
     }
@@ -530,7 +556,10 @@ function LoginScreen({ navigation, onAuth }: any) {
       return;
     }
     try {
-      const redirect = typeof window !== 'undefined' ? `${window.location.origin}/?type=recovery` : undefined;
+      const redirect =
+        Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).location?.origin
+          ? `${(window as any).location.origin}/?type=recovery`
+          : undefined;
       const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
         redirectTo: redirect,
       });
@@ -658,13 +687,7 @@ function AuthStack({ onAuth }: any) {
 }
 
 function AlliScreen() {
-  return (
-    <View style={styles.centered}>
-      <Text style={[styles.title, { color: '#B9A68D' }]}>Alli (AI Chatbot)</Text>
-      <Text>Conversational AI coming soon!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+  return <AlliChatScreen />;
 }
 
 function GoalsScreen() {
@@ -745,14 +768,6 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
 
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
-
-  const getLogoSource = () => {
-    if (Platform.OS === 'web') {
-      const v = Date.now();
-      return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
-    }
-    return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
-  };
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -913,6 +928,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 32,
+  },
   authContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -932,6 +955,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#B9A68D',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  description: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
   },
   input: {
     width: '100%',
@@ -971,5 +1012,90 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     borderRadius: 8,
     width: 200,
+  },
+  macroGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  macroItem: {
+    flexBasis: '48%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
+  },
+  macroValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  macroLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  emptyText: {
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  foodItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
+  },
+  foodItemContent: {
+    flexDirection: 'row',
+    flex: 1,
+    gap: 10,
+    paddingRight: 8,
+  },
+  foodImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  foodDetails: {
+    flex: 1,
+  },
+  foodName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  foodServing: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  foodCalories: {
+    fontSize: 12,
+    color: '#111827',
+    marginTop: 6,
+    fontWeight: '700',
+  },
+  foodMacros: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+  },
+  macroText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  removeButton: {
+    paddingLeft: 8,
+    paddingTop: 2,
   },
 });

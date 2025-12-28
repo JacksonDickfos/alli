@@ -16,8 +16,10 @@
     "@react-navigation/native-stack": "^7.3.21",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
     "react-native-screens": "~3.29.0",
     "react-native-safe-area-context": "4.8.2"
   }
