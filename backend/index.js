@@ -100,19 +100,26 @@ app.get('/message', (req, res) => {
 // Body: { messages: [{ role: 'user'|'assistant'|'system', content: string }], ...optional params }
 app.post('/chat', async (req, res) => {
   try {
+    console.log('📨 Received /chat request');
+    
     if (BACKEND_API_KEY) {
       const clientKey = req.header('x-api-key');
       if (!clientKey || clientKey !== BACKEND_API_KEY) {
+        console.log('❌ Unauthorized: Invalid API key');
         return res.status(401).json({ error: 'Unauthorized' });
       }
     }
 
     if (!NOVITA_API_KEY || !NOVITA_MODEL) {
+      console.log('❌ Server not configured - missing NOVITA_API_KEY or NOVITA_MODEL');
       return res.status(500).json({
         error:
           'Server not configured. Set NOVITA_API_KEY and NOVITA_MODEL environment variables.',
       });
     }
+
+    console.log('✅ API keys validated');
+    console.log('🔧 Model:', NOVITA_MODEL);
 
     const { messages, max_tokens, temperature } = req.body || {};
 
@@ -134,6 +141,10 @@ app.post('/chat', async (req, res) => {
       reasoning: { enabled: false },
     };
 
+    console.log('📤 Sending request to Novita AI...');
+    console.log('🔗 Endpoint:', NOVITA_ENDPOINT);
+    console.log('💬 Messages count:', messagesWithSystem.length);
+
     const nvRes = await fetch(NOVITA_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -144,8 +155,13 @@ app.post('/chat', async (req, res) => {
       body: JSON.stringify(payload),
     });
 
+    console.log('📥 Received response from Novita AI');
+    console.log('📊 Status:', nvRes.status, nvRes.statusText);
+
     const data = await nvRes.json().catch(() => ({}));
+    
     if (!nvRes.ok) {
+      console.log('❌ Novita AI error:', data);
       return res.status(nvRes.status).json({
         error: data?.error?.message || data?.error || 'Novita AI request failed',
         details: data,
@@ -153,13 +169,17 @@ app.post('/chat', async (req, res) => {
     }
 
     const content = data?.choices?.[0]?.message?.content ?? '';
+    console.log('✅ Response received successfully');
+    console.log('📝 Content length:', content.length);
+    
     return res.json({
       message: { role: 'assistant', content },
       usage: data?.usage,
       raw: data,
     });
   } catch (err) {
-    console.error('Chat proxy error:', err);
+    console.error('❌ Chat proxy error:', err);
+    console.error('Error details:', err instanceof Error ? err.message : String(err));
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
