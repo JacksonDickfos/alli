@@ -14,11 +14,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 app.use(cors());
 app.use(express.json());
 
-// Fireworks proxy config (keep API key on server; do NOT put it in the mobile app)
-const FIREWORKS_ENDPOINT =
-  process.env.FIREWORKS_ENDPOINT || 'https://api.fireworks.ai/inference/v1/chat/completions';
-const FIREWORKS_API_KEY = process.env.FIREWORKS_API_KEY; // required
-const FIREWORKS_MODEL = process.env.FIREWORKS_MODEL; // required
+// Novita AI proxy config (keep API key on server; do NOT put it in the mobile app)
+const NOVITA_ENDPOINT =
+  process.env.NOVITA_ENDPOINT || 'https://api.novita.ai/dedicated/v1/openai/chat/completions';
+const NOVITA_API_KEY = process.env.NOVITA_API_KEY; // required
+const NOVITA_MODEL = process.env.NOVITA_MODEL; // required
 const BACKEND_API_KEY = process.env.BACKEND_API_KEY; // optional: if set, require x-api-key header
 
 // System prompt for Alli - makes responses simple and human-friendly
@@ -107,15 +107,14 @@ app.post('/chat', async (req, res) => {
       }
     }
 
-    if (!FIREWORKS_API_KEY || !FIREWORKS_MODEL) {
+    if (!NOVITA_API_KEY || !NOVITA_MODEL) {
       return res.status(500).json({
         error:
-          'Server not configured. Set FIREWORKS_API_KEY and FIREWORKS_MODEL environment variables.',
+          'Server not configured. Set NOVITA_API_KEY and NOVITA_MODEL environment variables.',
       });
     }
 
-    const { messages, max_tokens, top_p, top_k, presence_penalty, frequency_penalty, temperature } =
-      req.body || {};
+    const { messages, max_tokens, temperature } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages[] is required' });
@@ -128,30 +127,27 @@ app.post('/chat', async (req, res) => {
       : [{ role: 'system', content: ALLI_SYSTEM_PROMPT }, ...messages];
 
     const payload = {
-      model: FIREWORKS_MODEL,
-      max_tokens: typeof max_tokens === 'number' ? max_tokens : 4000,
-      top_p: typeof top_p === 'number' ? top_p : 1,
-      top_k: typeof top_k === 'number' ? top_k : 40,
-      presence_penalty: typeof presence_penalty === 'number' ? presence_penalty : 0,
-      frequency_penalty: typeof frequency_penalty === 'number' ? frequency_penalty : 0,
-      temperature: typeof temperature === 'number' ? temperature : 0.6,
+      model: NOVITA_MODEL,
       messages: messagesWithSystem,
+      temperature: typeof temperature === 'number' ? temperature : 0.3,
+      max_tokens: typeof max_tokens === 'number' ? max_tokens : 800,
+      reasoning: { enabled: false },
     };
 
-    const fwRes = await fetch(FIREWORKS_ENDPOINT, {
+    const nvRes = await fetch(NOVITA_ENDPOINT, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${FIREWORKS_API_KEY}`,
+        Authorization: `Bearer ${NOVITA_API_KEY}`,
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await fwRes.json().catch(() => ({}));
-    if (!fwRes.ok) {
-      return res.status(fwRes.status).json({
-        error: data?.error?.message || data?.error || 'Fireworks request failed',
+    const data = await nvRes.json().catch(() => ({}));
+    if (!nvRes.ok) {
+      return res.status(nvRes.status).json({
+        error: data?.error?.message || data?.error || 'Novita AI request failed',
         details: data,
       });
     }
