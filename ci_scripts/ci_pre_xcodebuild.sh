@@ -4,6 +4,14 @@ set -e
 
 echo "🔧 Running pre-build script for Xcode Cloud..."
 
+# Install Node.js dependencies first (required for Expo/React Native)
+echo "📦 Installing Node.js dependencies..."
+if [ -f "package-lock.json" ]; then
+    npm ci
+else
+    npm install
+fi
+
 # Navigate to ios directory
 cd ios
 
@@ -17,4 +25,4 @@ fi
 echo "📦 Installing CocoaPods dependencies..."
 pod install
 
-echo "✅ CocoaPods installation complete!"
+echo "✅ Pre-build setup complete!"
