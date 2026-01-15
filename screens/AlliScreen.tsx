@@ -68,11 +68,9 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
   // Setup voice service callbacks - run once on mount
   useEffect(() => {
-    // Connect realtime on mount
-    console.log('📱 AlliScreen: Connecting to realtime service');
-    realtimeService.connect().catch((err) => {
-      console.error('❌ AlliScreen: Failed to connect to realtime:', err);
-    });
+    // Don't connect on mount in production — only connect when the user actually
+    // uses voice/text in this screen. This prevents release users from seeing
+    // startup issues if the realtime proxy URL isn't configured yet.
     realtimeService.setCallbacks({
       onResponse: (text: string) => {
         // Always update messages - UI handles visibility
@@ -103,7 +101,9 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
       },
       onError: (m: string) => {
         console.log('Realtime error:', m);
-        Alert.alert('Error', m);
+        // Avoid hard-crashing/blanking the UI in release. Show an alert so the user
+        // can still use the rest of the app.
+        Alert.alert('Alli voice unavailable', m);
         setIsListening(false);
         setIsProcessing(false);
         setCurrentTranscript('');

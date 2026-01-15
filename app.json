@@ -59,6 +59,8 @@
       "eas": {
         "projectId": "a6585e07-3b20-4942-a9c8-d443e401ea33"
       },
+      "backendUrl": "",
+      "realtimeProxyUrl": "",
       "supabaseUrl": "https://rkkoppppcxvbdzudzijw.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJra29wcHBwY3h2YmR6dWR6aWp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDExNDcsImV4cCI6MjA3NTYxNzE0N30.oLg5LsMNfuyuN3Vd_E0d1MQBQ5autzX1ZczczpthsgM"
     },

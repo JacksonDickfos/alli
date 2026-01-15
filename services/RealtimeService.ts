@@ -5,6 +5,7 @@
 
 import { Platform, AppState } from 'react-native';
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 import { pcm16AudioCapture } from './PCM16AudioCapture';
 
 // Simplified callbacks - only what's essential
@@ -23,10 +24,13 @@ export class RealtimeService {
   private isRecording = false;
   // IMPORTANT:
   // - In development we default to a LAN proxy (works on your Wi‑Fi)
-  // - In production/TestFlight this MUST be configured via EXPO_PUBLIC_REALTIME_PROXY_URL
-  //   otherwise the app will try to connect to an unreachable LAN host for users.
+  // - In production/TestFlight this MUST be configured via one of:
+  //   - EXPO_PUBLIC_REALTIME_PROXY_URL (preferred), OR
+  //   - app.json -> expo.extra.realtimeProxyUrl
+  //   Otherwise, users can't reach your laptop/LAN IP.
   private proxyUrl =
     (process.env.EXPO_PUBLIC_REALTIME_PROXY_URL as string | undefined) ||
+    (Constants.expoConfig?.extra as any)?.realtimeProxyUrl ||
     (__DEV__ ? 'ws://192.168.4.29:8080/realtime' : '');
   private sessionCreated = false; // Track if OpenAI session is ready
   private isOpenAIConnected = false; // Track if OpenAI is actually connected (via connection_status)
@@ -44,7 +48,7 @@ export class RealtimeService {
 
     if (!this.proxyUrl) {
       const msg =
-        'Realtime voice is not configured. Set EXPO_PUBLIC_REALTIME_PROXY_URL (e.g. wss://your-domain/realtime).';
+        'Realtime voice is not configured. Set EXPO_PUBLIC_REALTIME_PROXY_URL (or set expo.extra.realtimeProxyUrl in app.json) to your public wss://.../realtime endpoint.';
       console.warn(`⚠️ ${msg}`);
       this.callbacks.onError?.(msg);
       throw new Error(msg);
