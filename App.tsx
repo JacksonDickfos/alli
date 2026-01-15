@@ -658,7 +658,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
   const getLogoSource = () => {
-    return require('./assets/fullname-logo.png');
+    return require('./assets/Chick2.png');
   };
 
   return (
