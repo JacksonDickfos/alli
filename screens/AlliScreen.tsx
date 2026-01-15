@@ -17,8 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
-import { simpleVoiceService } from '../services/SimpleVoiceService';
-import { realtimeVoiceService } from '../services/RealtimeVoiceService';
+import { realtimeService } from '../services/RealtimeService';
 
 interface Message {
   id: string;
@@ -33,9 +32,8 @@ interface AlliScreenProps {
 }
 
 export default function AlliScreen({ navigation }: AlliScreenProps) {
-  // Feature flag: enable realtime for testing
-  const USE_REALTIME = true;
-  const voiceService = USE_REALTIME ? realtimeVoiceService : simpleVoiceService;
+  // Using RealtimeService for voice interactions
+  const voiceService = realtimeService;
   const { state, getTodaysTotals } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -70,31 +68,47 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
   // Setup voice service callbacks - run once on mount
   useEffect(() => {
-    // Connect realtime on mount if enabled
-    if (USE_REALTIME) {
-      // Physical iPhone on same Wi‑Fi
-      const wsUrl = 'ws://192.168.4.29:8080/realtime';
-      console.log('📱 AlliScreen: Connecting to realtime with URL:', wsUrl);
-      realtimeVoiceService.connect({ url: wsUrl }).catch((err) => {
-        console.error('❌ AlliScreen: Failed to connect to realtime:', err);
-      });
-      realtimeVoiceService.setCallbacks({
-        onAIResponse: (text: string) => {
-          // Always update messages - UI handles visibility
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage && !lastMessage.isUser) {
-              return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text } : msg);
-            } else {
-              return [...prev, { id: String(Date.now()+1), text, isUser: false, timestamp: new Date(), type: 'text' }];
-            }
-          });
-        },
-        onError: (m: string) => {
-          console.log('Realtime error:', m);
+    // Connect realtime on mount
+    console.log('📱 AlliScreen: Connecting to realtime service');
+    realtimeService.connect().catch((err) => {
+      console.error('❌ AlliScreen: Failed to connect to realtime:', err);
+    });
+    realtimeService.setCallbacks({
+      onResponse: (text: string) => {
+        // Always update messages - UI handles visibility
+        setMessages(prev => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && !lastMessage.isUser) {
+            return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text } : msg);
+          } else {
+            return [...prev, { id: String(Date.now()+1), text, isUser: false, timestamp: new Date(), type: 'text' }];
+          }
+        });
+        setIsProcessing(false);
+      },
+      onTranscript: (text: string) => {
+        setCurrentTranscript(text);
+        // When transcript is complete (user stops recording), add it as a user message
+        if (text.trim() && !isListening) {
+          const userMessage: Message = {
+            id: Date.now().toString(),
+            text: text.trim(),
+            isUser: true,
+            timestamp: new Date(),
+            type: 'text',
+          };
+          setMessages(prev => [...prev, userMessage]);
+          setIsProcessing(true);
         }
-      });
-    }
+      },
+      onError: (m: string) => {
+        console.log('Realtime error:', m);
+        Alert.alert('Error', m);
+        setIsListening(false);
+        setIsProcessing(false);
+        setCurrentTranscript('');
+      }
+    });
     return () => { voiceService.cleanup(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -140,11 +154,7 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
     try {
       // Process the text message through voice service (will get AI response and speak it)
-      if (USE_REALTIME) {
-        await realtimeVoiceService.sendText(question);
-      } else {
-        await simpleVoiceService.processTranscript(question);
-      }
+      await realtimeService.sendText(question);
     } catch (error: any) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to get response. Please try again.');
@@ -155,127 +165,32 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
   const handleMicPress = async () => {
     if (isListening) {
-      // Stop listening
-      await voiceService.stopListening();
+      // Stop recording
+      await realtimeService.stopRecording();
       setIsListening(false);
       setCurrentTranscript('');
-    } else if (isSpeaking) {
-      // Stop speaking if currently speaking
-      await voiceService.stopSpeaking();
     } else {
-      // Start listening
+      // Start recording
       setIsProcessing(true);
       setCurrentTranscript('');
       
-      await voiceService.startListening({
-        onTranscriptStart: () => {
-          setIsListening(true);
-          setIsProcessing(false);
-        },
-        onTranscriptUpdate: (text: string) => {
-          setCurrentTranscript(text);
-        },
-        onTranscriptComplete: async (text: string) => {
-          setIsListening(false);
-          setCurrentTranscript('');
-          
-          if (!text.trim()) {
-            setIsProcessing(false);
-            return;
-          }
-
-          // Add user message (always add, even if chat is hidden - will show when opened)
-          const userMessage: Message = {
-            id: Date.now().toString(),
-            text: text,
-            isUser: true,
-            timestamp: new Date(),
-            type: 'text',
-          };
-          setMessages(prev => [...prev, userMessage]);
-          
-          setIsProcessing(true);
-          // Process transcript and get AI response
-          if (USE_REALTIME) { await realtimeVoiceService.sendText(text); } else { await simpleVoiceService.processTranscript(text); }
-          setIsProcessing(false);
-        },
-        onAIResponse: (text: string) => {
-          // Only update messages if chat is visible
-          // When hidden, we're voice-only - just speak, don't show text
-          if (showChat) {
-            setMessages(prev => {
-              const lastMessage = prev[prev.length - 1];
-              if (lastMessage && !lastMessage.isUser) {
-                // Update existing AI message
-                return prev.map(msg => 
-                  msg.id === lastMessage.id 
-                    ? { ...msg, text: text }
-                    : msg
-                );
-              } else {
-                // Create new AI message
-                return [...prev, {
-                  id: (Date.now() + 1).toString(),
-                  text: text,
-                  isUser: false,
-                  timestamp: new Date(),
-                  type: 'text',
-                }];
-              }
-            });
-          } else {
-            // Chat hidden - still store messages for when user opens chat
-            // But don't update state to avoid re-renders
-            setMessages(prev => {
-              const lastMessage = prev[prev.length - 1];
-              if (lastMessage && !lastMessage.isUser) {
-                // Update existing message silently (for when chat opens)
-                return prev.map(msg => 
-                  msg.id === lastMessage.id 
-                    ? { ...msg, text: text }
-                    : msg
-                );
-              } else {
-                // Create new message silently
-                return [...prev, {
-                  id: (Date.now() + 1).toString(),
-                  text: text,
-                  isUser: false,
-                  timestamp: new Date(),
-                  type: 'text',
-                }];
-              }
-            });
-          }
-          // Note: TTS happens in SimpleVoiceService, so speaking happens regardless
-        },
-        onSpeakingStart: () => {
-          setIsSpeaking(true);
-        },
-        onSpeakingComplete: () => {
-          setIsSpeaking(false);
-        },
-        onError: (error: string) => {
-          console.error('Voice error:', error);
-          Alert.alert('Voice Error', error);
-          setIsListening(false);
-          setIsProcessing(false);
-          setIsSpeaking(false);
-          setCurrentTranscript('');
-        },
-      });
+      try {
+        await realtimeService.startRecording();
+        setIsListening(true);
+        setIsProcessing(false);
+      } catch (error: any) {
+        console.error('Error starting recording:', error);
+        Alert.alert('Error', 'Failed to start recording. Please try again.');
+        setIsProcessing(false);
+      }
     }
   };
 
   const handleEndPress = async () => {
     if (isListening) {
-      await voiceService.stopListening();
+      await realtimeService.stopRecording();
       setIsListening(false);
       setCurrentTranscript('');
-    }
-    if (isSpeaking) {
-      await voiceService.stopSpeaking();
-      setIsSpeaking(false);
     }
     setIsProcessing(false);
   };
