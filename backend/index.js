@@ -139,6 +139,16 @@ async function fetchTextWithTimeout(url, options, timeoutMs) {
   }
 }
 
+function extractAssistantContent(data) {
+  // OpenAI-compatible responses
+  let content =
+    data?.choices?.[0]?.message?.content ??
+    data?.choices?.[0]?.text ??
+    '';
+  content = typeof content === 'string' ? content : String(content || '');
+  return content.trim();
+}
+
 // System prompt for Alli - makes responses simple and human-friendly
 // const ALLI_SYSTEM_PROMPT = `You are Alli, a friendly and supportive nutrition assistant. Your goal is to help people eat better and feel healthier.
 
@@ -350,64 +360,80 @@ app.post('/chat', async (req, res) => {
       max_tokens: typeof max_tokens === 'number' ? max_tokens : 800,
     };
 
-    const endpoint = provider === 'novita' ? NOVITA_ENDPOINT : OPENAI_ENDPOINT;
-    const apiKey = provider === 'novita' ? NOVITA_API_KEY : OPENAI_API_KEY;
-    const configuredModel = provider === 'novita' ? NOVITA_MODEL : OPENAI_MODEL;
+    const callProvider = async (providerName, timeoutMs) => {
+      const endpoint = providerName === 'novita' ? NOVITA_ENDPOINT : OPENAI_ENDPOINT;
+      const apiKey = providerName === 'novita' ? NOVITA_API_KEY : OPENAI_API_KEY;
+      const configuredModel = providerName === 'novita' ? NOVITA_MODEL : OPENAI_MODEL;
 
-    const usingNovitaDedicatedEndpoint = provider === 'novita' && /\/dedicated\/v1\/openai\/?/i.test(endpoint);
+      const usingNovitaDedicatedEndpoint =
+        providerName === 'novita' && /\/dedicated\/v1\/openai\/?/i.test(endpoint);
 
-    // Some Novita LLM API models don't accept revision-suffixed model IDs (e.g. `model:rev`),
-    // but dedicated endpoint model IDs DO include the endpoint suffix and must not be stripped.
-    const modelCandidates =
-      provider === 'novita' && !usingNovitaDedicatedEndpoint && typeof configuredModel === 'string' && configuredModel.includes(':')
-        ? [configuredModel, configuredModel.split(':')[0]]
-        : [configuredModel];
+      // Some Novita LLM API models don't accept revision-suffixed model IDs (e.g. `model:rev`),
+      // but dedicated endpoint model IDs DO include the endpoint suffix and must not be stripped.
+      const modelCandidates =
+        providerName === 'novita' &&
+        !usingNovitaDedicatedEndpoint &&
+        typeof configuredModel === 'string' &&
+        configuredModel.includes(':')
+          ? [configuredModel, configuredModel.split(':')[0]]
+          : [configuredModel];
 
-    console.log('📤 Sending request to LLM provider...');
-    console.log('🔗 Endpoint:', endpoint);
-    console.log('💬 Messages count:', messagesWithSystem.length);
+      console.log('📤 Sending request to LLM provider...');
+      console.log('🤖 Provider:', providerName);
+      console.log('🔗 Endpoint:', endpoint);
+      console.log('💬 Messages count:', messagesWithSystem.length);
 
-    let upstreamRes;
-    let data;
-    let usedModel = modelCandidates[0];
+      let upstreamRes;
+      let data;
+      let usedModel = modelCandidates[0];
 
-    for (const candidate of modelCandidates) {
-      usedModel = candidate;
-      const payload = { model: candidate, ...basePayload };
+      for (const candidate of modelCandidates) {
+        usedModel = candidate;
+        const payload = { model: candidate, ...basePayload };
 
-      console.log('🧠 Trying model:', candidate);
-      const result = await fetchJsonWithTimeout(
-        endpoint,
-        {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+        console.log('🧠 Trying model:', candidate);
+        const result = await fetchJsonWithTimeout(
+          endpoint,
+          {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(payload),
           },
-          body: JSON.stringify(payload),
-        },
-        25000
-      );
+          timeoutMs
+        );
 
-      upstreamRes = result.res;
-      data = result.data;
+        upstreamRes = result.res;
+        data = result.data;
 
-      if (upstreamRes.ok) break;
+        if (upstreamRes.ok) break;
 
-      const isModelNotFound =
-        upstreamRes.status === 404 &&
-        (data?.reason === 'MODEL_NOT_FOUND' ||
-          data?.message === 'model not found' ||
-          data?.metadata?.reason?.includes?.('not found'));
+        const isModelNotFound =
+          upstreamRes.status === 404 &&
+          (data?.reason === 'MODEL_NOT_FOUND' ||
+            data?.message === 'model not found' ||
+            data?.metadata?.reason?.includes?.('not found'));
 
-      if (provider === 'novita' && isModelNotFound && candidate !== modelCandidates[modelCandidates.length - 1]) {
-        console.log('↩️ Model not found, retrying with fallback model…');
-        continue;
+        if (
+          providerName === 'novita' &&
+          isModelNotFound &&
+          candidate !== modelCandidates[modelCandidates.length - 1]
+        ) {
+          console.log('↩️ Model not found, retrying with fallback model…');
+          continue;
+        }
+
+        break;
       }
 
-      break;
-    }
+      return { upstreamRes, data, usedModel };
+    };
+
+    // Primary call (Novita preferred if configured)
+    let { upstreamRes, data, usedModel } = await callProvider(provider, 25_000);
 
     console.log('📥 Received response from upstream');
     console.log('📊 Status:', upstreamRes.status, upstreamRes.statusText);
@@ -420,19 +446,38 @@ app.post('/chat', async (req, res) => {
       });
     }
 
-    let content =
-      data?.choices?.[0]?.message?.content ??
-      data?.choices?.[0]?.text ??
-      '';
-    content = typeof content === 'string' ? content : String(content || '');
+    // Extract assistant content and handle rare empty responses.
+    // This can happen due to upstream filtering, tool-call-only payloads, or transient provider issues.
+    let content = extractAssistantContent(data);
+    if (!content) {
+      console.warn('⚠️ Upstream returned empty content; retrying once.');
+      try {
+        ({ upstreamRes, data, usedModel } = await callProvider(provider, 15_000));
+        if (upstreamRes.ok) content = extractAssistantContent(data);
+      } catch (e) {
+        console.warn('⚠️ Retry failed:', e instanceof Error ? e.message : String(e));
+      }
+    }
 
-    // Some OpenAI-compatible providers occasionally return an empty message content
-    // (e.g. filtered output, transient upstream bug, or tool-call-only payload).
-    // Never return empty content to the app — it triggers "Empty model response" UX errors.
-    if (!content.trim()) {
-      console.warn('⚠️ Upstream returned empty content; returning fallback message.');
+    // If Novita is primary and still empty, fall back to OpenAI if configured.
+    if (!content && provider === 'novita' && OPENAI_API_KEY) {
+      console.warn('⚠️ Novita returned empty content; falling back to OpenAI.');
+      try {
+        const openaiResult = await callProvider('openai', 25_000);
+        if (openaiResult.upstreamRes.ok) {
+          content = extractAssistantContent(openaiResult.data);
+        } else {
+          console.warn('⚠️ OpenAI fallback failed:', openaiResult.data);
+        }
+      } catch (e) {
+        console.warn('⚠️ OpenAI fallback threw:', e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // Last resort: never return empty content to the app.
+    if (!content) {
       content =
-        "Sorry — I didn't get a response that time. Could you try asking again in a shorter sentence?";
+        "Sorry — something went wrong on my end and I didn’t get an answer back. Please try again in a moment.";
     }
 
     console.log('✅ Response received successfully');
