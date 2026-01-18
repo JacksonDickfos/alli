@@ -420,7 +420,21 @@ app.post('/chat', async (req, res) => {
       });
     }
 
-    const content = data?.choices?.[0]?.message?.content ?? '';
+    let content =
+      data?.choices?.[0]?.message?.content ??
+      data?.choices?.[0]?.text ??
+      '';
+    content = typeof content === 'string' ? content : String(content || '');
+
+    // Some OpenAI-compatible providers occasionally return an empty message content
+    // (e.g. filtered output, transient upstream bug, or tool-call-only payload).
+    // Never return empty content to the app — it triggers "Empty model response" UX errors.
+    if (!content.trim()) {
+      console.warn('⚠️ Upstream returned empty content; returning fallback message.');
+      content =
+        "Sorry — I didn't get a response that time. Could you try asking again in a shorter sentence?";
+    }
+
     console.log('✅ Response received successfully');
     console.log('📝 Content length:', content.length);
     
