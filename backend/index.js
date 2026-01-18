@@ -101,7 +101,12 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: ac.signal });
+    // NOTE: Some serverless runtimes can ignore abort during DNS/TLS stalls.
+    // Promise.race guarantees we return a response in time for Vercel limits.
+    const res = await Promise.race([
+      fetch(url, { ...options, signal: ac.signal }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Upstream request timed out after ${timeoutMs}ms`)), timeoutMs + 50)),
+    ]);
     const data = await res.json().catch(() => ({}));
     return { res, data };
   } catch (err) {
@@ -118,7 +123,10 @@ async function fetchTextWithTimeout(url, options, timeoutMs) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: ac.signal });
+    const res = await Promise.race([
+      fetch(url, { ...options, signal: ac.signal }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Upstream request timed out after ${timeoutMs}ms`)), timeoutMs + 50)),
+    ]);
     const text = await res.text().catch(() => '');
     return { res, text };
   } catch (err) {
