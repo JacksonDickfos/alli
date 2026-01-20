@@ -16,7 +16,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera to take photos of food for nutrition analysis."
-      }
+      },
+      "bundleIdentifier": "com.abdullah-786.allinutritionapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +25,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["CAMERA", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.abdullah_786.allinutritionapp"
     },
     "web": {
       "template": "./web/index.html",

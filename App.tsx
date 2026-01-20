@@ -1,8 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Camera from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { StyleSheet, Text, View, TextInput, Button, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Button, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,7 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import AlliChatScreen from './components/AlliChatScreen';
+import VoiceAgent from './components/VoiceAgent';
+import { registerGlobals } from 'react-native-webrtc'; // ← Use this, not @livekit version
 
+registerGlobals();
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -42,7 +46,7 @@ function HomeCard({ title, image, onPress, index }: { title: string; image: any;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const pressAnim = useRef(new Animated.Value(1)).current;
   const [pressed, setPressed] = React.useState(false);
-  
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -133,7 +137,7 @@ function HomeCard({ title, image, onPress, index }: { title: string; image: any;
     </Animated.View>
   );
 }
-
+// Home Screen component
 function HomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
   // Placeholder for first name, replace with real user data if available
@@ -226,7 +230,7 @@ function NutritionScreen() {
     try {
       // Simulate AI analysis with realistic food data
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       const mockAnalysis = {
         id: Date.now().toString(),
         name: "Mixed Salad with Chicken",
@@ -240,7 +244,7 @@ function NutritionScreen() {
         confidence: 0.87,
         imageUri
       };
-      
+
       setFoodLog(prev => [mockAnalysis, ...prev]);
       Alert.alert("Food Logged!", `Analyzed: ${mockAnalysis.name}\nCalories: ${mockAnalysis.calories}\nConfidence: ${Math.round(mockAnalysis.confidence * 100)}%`);
     } catch (error) {
@@ -268,14 +272,14 @@ function NutritionScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <Text style={[styles.title, { color: "#B9A68D", marginBottom: 20 }]}>Nutrition</Text>
-        
+
         {/* Food Picture Analyzer */}
         <View style={[styles.card, { marginBottom: 20 }]}>
           <Text style={[styles.subtitle, { color: "#B9A68D", marginBottom: 15 }]}>Food Picture Analyzer</Text>
           <Text style={[styles.description, { marginBottom: 20 }]}>
             Take a photo of your food and get instant macronutrient analysis
           </Text>
-          
+
           <TouchableOpacity
             style={[styles.button, { backgroundColor: isAnalyzing ? "#ccc" : "#B9A68D" }]}
             onPress={takePicture}
@@ -441,9 +445,9 @@ function SignUpScreen({ navigation, onAuth }: any) {
         value={password}
         onChangeText={setPassword}
       />
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.buttonDisabled]} 
-        onPress={handleSignUp} 
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSignUp}
         disabled={loading}
       >
         <Text style={styles.buttonText}>
@@ -600,9 +604,9 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handlePerformReset} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handlePerformReset}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
@@ -629,9 +633,9 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
@@ -688,6 +692,10 @@ function AuthStack({ onAuth }: any) {
 
 function AlliScreen() {
   return <AlliChatScreen />;
+
+}
+function VoiceAgentScreen() {
+  return <VoiceAgent />
 }
 
 function GoalsScreen() {
@@ -735,9 +743,10 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         name="Alli"
         component={AlliScreen}
         options={{
-          tabBarButton: (props) => <AlliTabBarButton {...props} />, 
+          tabBarButton: (props) => <AlliTabBarButton {...props} />,
         }}
       />
+      <Tab.Screen name="VoiceAgent" component={VoiceAgentScreen} />
       <Tab.Screen name="Goals" component={GoalsScreen} />
       <Tab.Screen name="Account">
         {() => <AccountScreen onLogout={onLogout} />}
@@ -796,7 +805,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
       >
         <RNAnimated.View style={{ transform: [{ scale }], opacity }}>
           <LinearGradient
-            colors={[ '#4F8EF7', '#8A2BE2', '#FF3B30' ]}
+            colors={['#4F8EF7', '#8A2BE2', '#FF3B30']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
@@ -866,7 +875,7 @@ export default function App() {
             setUpdateAvailable(true);
           }
           localStorage.setItem(KEY, text);
-        } catch {}
+        } catch { }
       };
       check();
       interval = setInterval(check, 30000);
@@ -881,7 +890,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
-    try { await supabase.auth.signOut(); } catch {}
+    try { await supabase.auth.signOut(); } catch { }
     setIsLoggedIn(false);
   };
 
