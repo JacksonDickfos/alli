@@ -3,13 +3,21 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+// const jwt = require('jsonwebtoken');
+const jwtLib = require('jsonwebtoken');
+
 
 // Use native fetch (Node 18+)
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+// const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
+const { AccessToken } = require('livekit-server-sdk');
+
+
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 app.use(cors());
 app.use(express.json());
@@ -120,7 +128,8 @@ app.post('/login', async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({ error: 'Invalid credentials.' });
   }
-  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '7d' });
+  const token = jwtLib.sign({ email }, JWT_SECRET, { expiresIn: '7d' });
+
   res.json({ token });
 });
 
@@ -133,7 +142,7 @@ app.get('/message', (req, res) => {
 app.post('/chat', async (req, res) => {
   try {
     console.log('📨 Received /chat request');
-    
+
     if (BACKEND_API_KEY) {
       const clientKey = req.header('x-api-key');
       if (!clientKey || clientKey !== BACKEND_API_KEY) {
@@ -191,7 +200,7 @@ app.post('/chat', async (req, res) => {
     console.log('📊 Status:', nvRes.status, nvRes.statusText);
 
     const data = await nvRes.json().catch(() => ({}));
-    
+
     if (!nvRes.ok) {
       console.log('❌ Novita AI error:', data);
       return res.status(nvRes.status).json({
@@ -203,7 +212,7 @@ app.post('/chat', async (req, res) => {
     const content = data?.choices?.[0]?.message?.content ?? '';
     console.log('✅ Response received successfully');
     console.log('📝 Content length:', content.length);
-    
+
     return res.json({
       message: { role: 'assistant', content },
       usage: data?.usage,
@@ -213,6 +222,104 @@ app.post('/chat', async (req, res) => {
     console.error('❌ Chat proxy error:', err);
     console.error('Error details:', err instanceof Error ? err.message : String(err));
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+// Voice Agent Backend Endpoint
+// Voice Agent Backend Endpoint
+app.post('/voice-agent', async (req, res) => {
+  try {
+    console.log('📦 Request body:', req.body); // Debug: see what's in body
+    console.log('📦 Request headers:', req.headers); // Debug: check content-type
+    console.log('🔑 LIVEKIT_API_KEY exists:', !!LIVEKIT_API_KEY);
+    console.log('🔑 LIVEKIT_API_SECRET exists:', !!LIVEKIT_API_SECRET);
+
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+      console.error('❌ Missing LiveKit credentials');
+      return res.status(500).json({ error: 'LiveKit not configured' });
+    }
+
+    const { roomName, participantName } = req.body;
+
+    console.log('📝 Request body:', { roomName, participantName });
+
+    if (!roomName || !participantName) {
+      return res.status(400).json({ error: 'roomName and participantName required' });
+    }
+
+    // const roomService = new RoomServiceClient(
+    //   process.env.LIVEKIT_URL,
+    //   process.env.LIVEKIT_API_KEY,
+    //   process.env.LIVEKIT_API_SECRET
+    // );
+
+    const token = new AccessToken(
+      LIVEKIT_API_KEY,
+      LIVEKIT_API_SECRET,
+      {
+        identity: participantName,
+        ttl: 60 * 60, // 1 hour
+      }
+    );
+
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+    // 2️⃣ DISPATCH AGENT JOB (THIS IS MISSING)
+    // await roomService.dispatchAgentJob({
+    //   room: roomName,
+    //   agentName: "", // default agent
+    // });
+
+
+    const jwt = await token.toJwt();
+
+    console.log('✅ LiveKit token generated:', jwt.slice(0, 30) + '...');
+
+    res.json({ token: jwt });
+
+  } catch (err) {
+    console.error('❌ LiveKit token error:', err);
+    console.error('❌ Error details:', err.message); // More detailed error
+    console.error('❌ Error stack:', err.stack); // Full stack trace
+    res.status(500).json({
+      error: 'Token generation failed',
+      details: err.message // Include error message in response
+    });
+  }
+});
+
+// Voice response endpoint - processes text and returns AI response
+app.post('/voice-response', async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'message is required' });
+    }
+
+    console.log('📝 Voice message received:', message);
+
+    // Call Python agent for response
+    const response = await fetch('http://localhost:3002/process-voice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Python agent error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('🤖 Agent response:', data.response);
+
+    res.json({ response: data.response });
+  } catch (err) {
+    console.error('❌ Voice response error:', err.message);
+    res.status(500).json({ error: 'Failed to process voice message' });
   }
 });
 

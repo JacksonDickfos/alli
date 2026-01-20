@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,11 +15,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../lib/supabase';
+import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
+import Voice from '@react-native-voice/voice';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -318,10 +321,10 @@ function CopyButton({ content }: { content: string }) {
 
   return (
     <TouchableOpacity onPress={handleCopy} style={styles.copyButton}>
-      <Ionicons 
-        name={copied ? 'checkmark-circle' : 'copy-outline'} 
-        size={18} 
-        color={copied ? '#10B981' : '#9CA3AF'} 
+      <Ionicons
+        name={copied ? 'checkmark-circle' : 'copy-outline'}
+        size={18}
+        color={copied ? '#10B981' : '#9CA3AF'}
       />
       <Text style={[styles.copyButtonText, copied && styles.copyButtonTextCopied]}>
         {copied ? 'Copied!' : 'Copy'}
@@ -345,6 +348,9 @@ export default function AlliChatScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const visibleMessages = useMemo(() => messages.filter(m => m.role !== 'system'), [messages]);
 
@@ -600,6 +606,110 @@ export default function AlliChatScreen() {
       setSending(false);
     }
   };
+  useEffect(() => {
+    Voice.onSpeechStart = () => {
+      setIsListening(true);
+    };
+
+    Voice.onSpeechEnd = () => {
+      setIsListening(false);
+    };
+
+    Voice.onSpeechResults = (e) => {
+      if (e.value && e.value.length > 0) {
+        setInput(e.value[0]);
+      }
+    };
+
+    Voice.onSpeechError = (e) => {
+      console.error('Voice error:', e);
+      setIsListening(false);
+    };
+
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+  const toggleVoiceInput = async () => {
+    if (isListening) {
+      try {
+        await Voice.stop();
+        setIsListening(false);
+      } catch (e) {
+        console.error(e);
+        setIsListening(false);
+      }
+    } else {
+      try {
+        await Voice.start('en-US');
+        setIsListening(true);
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Voice recognition failed');
+      }
+    }
+  };
+  // const startListening = async () => {
+  //   try {
+  //     await Voice.start('en-US');
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // };
+  // // Start Recording
+  // const startRecording = async () => {
+  //   try {
+  //     const permission = await Audio.requestPermissionsAsync();
+  //     if (!permission.granted) {
+  //       Alert.alert('Permission required', 'Microphone access is needed.');
+  //       return;
+  //     }
+
+  //     await Audio.setAudioModeAsync({
+  //       allowsRecordingIOS: true,
+  //       playsInSilentModeIOS: true,
+  //     });
+
+  //     const recording = new Audio.Recording();
+  //     await recording.prepareToRecordAsync(
+  //       Audio.RecordingOptionsPresets.HIGH_QUALITY
+  //     );
+  //     await recording.startAsync();
+
+  //     recordingRef.current = recording;
+  //     setIsRecording(true);
+  //   } catch (err) {
+  //     Alert.alert('Error', 'Failed to start recording');
+  //   }
+  // };
+  // // Stop REcording
+  // const stopRecording = async () => {
+  //   try {
+  //     const recording = recordingRef.current;
+  //     if (!recording) return;
+
+  //     await recording.stopAndUnloadAsync();
+  //     const uri = recording.getURI();
+  //     setIsRecording(false);
+  //     recordingRef.current = null;
+
+  //     if (!uri) return;
+
+  //     // 🔥 TEMP SIMPLE MODE:
+  //     // You can integrate Whisper backend later.
+  //     // For now we simulate voice → text
+  //     Alert.prompt(
+  //       'Voice captured',
+  //       'Convert speech to text (temporary)',
+  //       text => {
+  //         if (text) sendMessage(text);
+  //       }
+  //     );
+  //   } catch (err) {
+  //     Alert.alert('Error', 'Failed to stop recording');
+  //     setIsRecording(false);
+  //   }
+  // };
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isUser = item.role === 'user';
@@ -808,6 +918,20 @@ export default function AlliChatScreen() {
                   <Ionicons name="arrow-up" size={20} color="#fff" />
                 )}
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={toggleVoiceInput}
+                style={[styles.micBtn, isListening && styles.micBtnActive]}
+              >
+                <Ionicons
+                  name={isListening ? "mic" : "mic-outline"}
+                  size={20}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+              {/* <TouchableOpacity onPress={startListening} style={styles.micBtn}>
+                <Ionicons name="mic" size={20} color="#fff" />
+              </TouchableOpacity> */}
+
             </View>
             <Text style={styles.disclaimer}>
               Alli can make mistakes. Verify important nutrition info.
@@ -957,7 +1081,7 @@ const styles = StyleSheet.create({
 
   // Messages
   messagesList: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20 },
-  
+
   // User message - right aligned bubble
   userMessageContainer: {
     alignItems: 'flex-end',
@@ -1088,4 +1212,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  micBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#6B7280',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtnActive: {
+    backgroundColor: '#EF4444',
+  },
+
 });
