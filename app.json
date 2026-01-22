@@ -51,6 +51,11 @@
           "photosPermission": "Allow Alli to access your photos to select food images for nutrition analysis."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a36aadaa-3c5d-41a2-85fd-2020fbb19dab"
+      }
+    }
   }
 }
