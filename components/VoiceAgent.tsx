@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, Alert, Platform, PermissionsAndroid, StyleSheet } from 'react-native';
-import { Room, createLocalAudioTrack, RoomEvent, LocalAudioTrack } from 'livekit-client';
+import { Room, createLocalAudioTrack, RoomEvent, LocalAudioTrack, RemoteTrack } from 'livekit-client';
 import { registerGlobals } from 'react-native-webrtc';
-import { MediaStream, mediaDevices } from 'react-native-webrtc';
+import { MediaStream } from 'react-native-webrtc';
 
-// ⚡ Polyfill navigator for React Native (fixes toLowerCase errors)
-if (typeof navigator === 'undefined') {
-    global.navigator = {} as any;
-}
-if (!navigator.userAgent) {
-    navigator.userAgent = 'ReactNative';
-}
+// Polyfill for React Native
+if (typeof navigator === 'undefined') global.navigator = {} as any;
+if (!navigator.userAgent) navigator.userAgent = 'ReactNative';
 
 registerGlobals();
 
-// ✅ Replace with your LiveKit cloud URL and Python backend endpoint
-// const LIVEKIT_URL = 'wss://voice-agent-saq96whw.livekit.cloud';
+// Replace with your LiveKit URL and backend
 const LIVEKIT_URL = 'wss://alli-h8mq663x.livekit.cloud';
 const BACKEND_URL = 'http://62.72.35.123:8003/start_call2';
 
@@ -23,7 +18,7 @@ export default function VoiceAgent() {
     const [room, setRoom] = useState<Room | null>(null);
     const [connected, setConnected] = useState(false);
     const [muted, setMuted] = useState(false);
-    const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
+    const [activeSpeaker, setActiveSpeaker] = useState<string>('Nobody');
     const [localTrack, setLocalTrack] = useState<LocalAudioTrack | null>(null);
 
     // Request microphone permission (Android)
@@ -37,38 +32,57 @@ export default function VoiceAgent() {
         return true;
     };
 
-    // Connect to LiveKit room
+    // Play a MediaStream in React Native using LiveKit trick
+    const playAudioTrack = (track: RemoteTrack | LocalAudioTrack) => {
+        const stream = new MediaStream();
+        stream.addTrack(track._mediaStreamTrack);
+        // // @ts-ignore
+        // const audioEl = new Audio();
+        // // @ts-ignore
+        // audioEl.srcObject = stream;
+        // audioEl.play().catch(err => console.log('Audio play error:', err));
+        console.log('🎧 Remote/Local track ready to play');
+    };
+
     const connectToRoom = async (token: string) => {
         try {
             const r = new Room({
                 adaptiveStream: true,
                 dynacast: true,
-                rtcConfig: {
-                    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
-                },
+                rtcConfig: { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] },
             });
 
-            // Subscribe to agent audio automatically
+            // Remote audio tracks
             r.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
                 if (track.kind === 'audio') {
                     console.log('🔊 Agent audio subscribed:', participant.identity);
-                    // ✅ Create a new MediaStream from the track
+                    // playAudioTrack(track);
+                    // ✅ For React Native, just call play()
+                    // track.play();
+                    // console.log('🎧 Remote/Local track ready to play');
+                    // Create MediaStream for RN
                     const stream = new MediaStream();
-                    stream.addTrack(track._mediaStreamTrack); // get the actual track
-                    // Use react-native-webrtc Audio component
-                    // For example, attach it to a <RTCView> or just let it play automatically
-                    // Some apps play automatically when you create the MediaStream
+                    stream.addTrack(track._mediaStreamTrack); // access the underlying MediaStreamTrack
                     console.log('🎧 MediaStream created for agent audio');
+
+                    // Listen for audioLevel changes to detect speaking
+                    // track.on('audioLevelChanged', level => {
+                    //     if (level > 0.05) setActiveSpeaker(participant.identity);
+                    // });
                 }
             });
 
-            // Detect active speaker
-            r.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-                if (speakers.length > 0) setActiveSpeaker(speakers[0].identity);
-                else setActiveSpeaker(null);
+            // Local track speaking detection
+            r.on(RoomEvent.LocalTrackPublished, trackPub => {
+                const track = trackPub.track;
+                if (track && track.kind === 'audio') {
+                    track.on('audioLevelChanged', level => {
+                        if (level > 0.05) setActiveSpeaker('You');
+                    });
+                }
             });
 
-            // Room connection events
+            // Room events
             r.on(RoomEvent.Connected, () => {
                 console.log('✅ Room connected');
                 setConnected(true);
@@ -76,7 +90,7 @@ export default function VoiceAgent() {
             r.on(RoomEvent.Disconnected, () => {
                 console.log('❌ Room disconnected');
                 setConnected(false);
-                setActiveSpeaker(null);
+                setActiveSpeaker('Nobody');
             });
             r.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
                 console.log('Connection quality:', quality, participant.identity);
@@ -85,7 +99,9 @@ export default function VoiceAgent() {
             // Create local audio track
             const track = await createLocalAudioTrack({ microphone: true });
             setLocalTrack(track);
-            console.log('🎙️ Local track ready:', track);
+
+            // Auto-play your own audio (optional)
+            playAudioTrack(track);
 
             // Connect with local track
             await r.connect(LIVEKIT_URL, token, { tracks: [track] });
@@ -98,7 +114,7 @@ export default function VoiceAgent() {
         }
     };
 
-    // Get token from Python backend and join room
+    // Connect button
     const handleConnect = async () => {
         const hasPermission = await requestPermissions();
         if (!hasPermission) {
@@ -109,7 +125,7 @@ export default function VoiceAgent() {
         try {
             const requestBody = {
                 agent_id: '123',
-                roomName: `room-123-${Date.now()}`, // unique room per session
+                roomName: `room-123-${Date.now()}`,
                 participantName: `user-${Date.now()}`,
             };
 
@@ -135,18 +151,18 @@ export default function VoiceAgent() {
         }
     };
 
-    // Disconnect from room
+    // Disconnect button
     const handleDisconnect = () => {
         if (room) {
             room.disconnect();
             setRoom(null);
             setConnected(false);
-            setActiveSpeaker(null);
+            setActiveSpeaker('Nobody');
             setLocalTrack(null);
         }
     };
 
-    // Toggle mute/unmute
+    // Mute/unmute
     const handleMuteToggle = () => {
         if (localTrack) {
             localTrack.enable(muted); // toggle
@@ -154,17 +170,10 @@ export default function VoiceAgent() {
         }
     };
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (room) room.disconnect();
-        };
-    }, [room]);
-
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Voice Agent {connected ? '(Connected)' : '(Disconnected)'}</Text>
-            {connected && <Text style={styles.speaker}>Active Speaker: {activeSpeaker || 'Nobody'}</Text>}
+            {connected && <Text style={styles.speaker}>Active Speaker: {activeSpeaker}</Text>}
             <Button title="Connect" onPress={handleConnect} disabled={connected} />
             <Button title="Disconnect" onPress={handleDisconnect} disabled={!connected} />
             <Button title={muted ? 'Unmute' : 'Mute'} onPress={handleMuteToggle} disabled={!connected} />

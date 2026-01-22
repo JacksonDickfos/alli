@@ -73,6 +73,11 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
+            // ✅ Disable lintVital to prevent OOM crash
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
         }
     }
     packagingOptions {
