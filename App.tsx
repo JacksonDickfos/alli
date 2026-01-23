@@ -145,17 +145,17 @@ function HomeScreen() {
   const cards = [
     {
       title: 'Alli',
-      image: require('./assets/alli-card.png'),
+      image: require('./assets/alli_card.png'),
       onPress: () => navigation.navigate('Alli'),
     },
     {
       title: 'Nutrition',
-      image: require('./assets/nutrition-card.png'),
+      image: require('./assets/nutrition_card.png'),
       onPress: () => navigation.navigate('Nutrition'),
     },
     {
       title: 'Goals',
-      image: require('./assets/goals-card.png'),
+      image: require('./assets/goals_card.png'),
       onPress: () => navigation.navigate('Goals'),
     },
   ];
