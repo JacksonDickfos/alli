@@ -1,0 +1,1 @@
+../../../../../node_modules/@livekit/react-native-webrtc/ios/RCTWebRTC/WebRTCModule+RTCMediaStream.h

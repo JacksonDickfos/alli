@@ -16,9 +16,9 @@ import { Animated as RNAnimated } from 'react-native';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import AlliChatScreen from './components/AlliChatScreen';
 import VoiceAgent from './components/VoiceAgent';
-import { registerGlobals } from 'react-native-webrtc'; // ← Use this, not @livekit version
+// import { registerGlobals } from 'react-native-webrtc'; // ← Use this, not @livekit version
 
-registerGlobals();
+// registerGlobals();
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();

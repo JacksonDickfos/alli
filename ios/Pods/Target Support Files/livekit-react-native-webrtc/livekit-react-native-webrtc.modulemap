@@ -1,0 +1,6 @@
+module livekit_react_native_webrtc {
+  umbrella header "livekit-react-native-webrtc-umbrella.h"
+
+  export *
+  module * { export * }
+}

@@ -1,16 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Button, Alert, Platform, PermissionsAndroid, StyleSheet } from 'react-native';
-import { Room, createLocalAudioTrack, RoomEvent, LocalAudioTrack, RemoteTrack, RemoteAudioTrack } from 'livekit-client';
-import { registerGlobals, RTCView, mediaDevices } from 'react-native-webrtc';
-import { MediaStream } from 'react-native-webrtc';
+import { Room, createLocalAudioTrack, RoomEvent, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
+import { registerGlobals, AudioSession } from '@livekit/react-native';
 
-// Polyfill for React Native
-if (typeof navigator === 'undefined') global.navigator = {} as any;
-if (!navigator.userAgent) navigator.userAgent = 'ReactNative';
-
+// Register WebRTC globals (required for LiveKit)
 registerGlobals();
 
-// Replace with your LiveKit URL and backend
 const LIVEKIT_URL = 'wss://alli-h8mq663x.livekit.cloud';
 const BACKEND_URL = 'http://62.72.35.123:8003/start_call2';
 
@@ -20,7 +15,7 @@ const VoiceAgent = () => {
     const [muted, setMuted] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState<string>('Nobody');
     const [localTrack, setLocalTrack] = useState<LocalAudioTrack | null>(null);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [speakerOn, setSpeakerOn] = useState(true);
 
     // Request microphone permission (Android)
     const requestPermissions = async () => {
@@ -33,70 +28,66 @@ const VoiceAgent = () => {
         return true;
     };
 
-    // Set audio output to speaker
-    const setAudioOutputToSpeaker = async () => {
+    // Configure audio session using LiveKit's AudioSession
+    const setupAudioSession = async () => {
         try {
-            const devices = await mediaDevices.enumerateDevices();
-            console.log('📱 Available audio devices:', devices.filter(d => d.kind === 'audiooutput'));
-            console.log('🔊 Audio routing configured');
+            // Configure for bidirectional communication (default)
+            await AudioSession.configureAudio({
+                android: {
+                    preferredOutputList: ['speaker'], // Use speaker by default
+                },
+                ios: {
+                    defaultToSpeaker: true,
+                }
+            });
+
+            // Start the audio session
+            await AudioSession.startAudioSession();
+
+            console.log('🔊 AudioSession configured and started');
+            setSpeakerOn(true);
         } catch (err) {
-            console.error('❌ Error setting audio output:', err);
+            console.error('❌ Error configuring AudioSession:', err);
         }
     };
 
-    // Play audio track in React Native
-    const playAudioTrack = (track: RemoteAudioTrack) => {
+    // Stop audio session
+    const stopAudioSession = async () => {
         try {
-            // Get the underlying MediaStreamTrack
-            const mediaStreamTrack = track.mediaStreamTrack;
-
-            // Ensure track is enabled
-            if (!mediaStreamTrack.enabled) {
-                mediaStreamTrack.enabled = true;
-                console.log('✅ Enabled audio track');
-            }
-
-            // Create a MediaStream and add the track
-            const stream = new MediaStream();
-            stream.addTrack(mediaStreamTrack);
-
-            // Set the stream to state
-            setRemoteStream(stream);
-
-            console.log('🎧 Audio stream ready:', stream.id);
-            console.log('   - Active:', stream.active);
-            console.log('   - Track enabled:', mediaStreamTrack.enabled);
-            console.log('   - Track muted:', mediaStreamTrack.muted);
-            console.log('   - Track readyState:', mediaStreamTrack.readyState);
-
+            await AudioSession.stopAudioSession();
+            console.log('🔇 AudioSession stopped');
         } catch (err) {
-            console.error('❌ Error playing audio:', err);
+            console.error('❌ Error stopping AudioSession:', err);
         }
     };
 
     const connectToRoom = async (token: string) => {
         try {
-            // Set audio to speaker
-            await setAudioOutputToSpeaker();
+            // Setup audio session BEFORE connecting
+            await setupAudioSession();
 
             const r = new Room({
                 adaptiveStream: true,
                 dynacast: true,
-                rtcConfig: { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] },
             });
 
-            // ✅ Remote audio tracks
+            // Remote audio track subscription
             r.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
                 if (track.kind === 'audio') {
                     console.log('🔊 Agent audio subscribed:', participant.identity);
                     console.log('   - Track sid:', track.sid);
                     console.log('   - Publication muted:', publication.isMuted);
 
-                    // Play the audio
-                    playAudioTrack(track as RemoteAudioTrack);
+                    const audioTrack = track as RemoteAudioTrack;
 
-                    // Listen for audio level changes
-                    track.on('audioLevelChanged', level => {
+                    // The track will automatically play through LiveKit's audio session
+                    console.log('🎧 Audio ready:', {
+                        enabled: audioTrack.mediaStreamTrack.enabled,
+                        readyState: audioTrack.mediaStreamTrack.readyState
+                    });
+
+                    // Monitor audio levels
+                    audioTrack.on('audioLevelChanged', level => {
                         if (level > 0.05) {
                             console.log('🗣️ Agent speaking, level:', level.toFixed(3));
                             setActiveSpeaker(participant.identity);
@@ -105,20 +96,19 @@ const VoiceAgent = () => {
                 }
             });
 
-            // Handle mute changes
+            // Track mute/unmute events
             r.on(RoomEvent.TrackMuted, (publication, participant) => {
-                console.log('🔇 Track muted:', publication.trackSid, participant.identity);
+                console.log('🔇 Track muted:', participant.identity);
             });
 
             r.on(RoomEvent.TrackUnmuted, (publication, participant) => {
-                console.log('🔊 Track unmuted:', publication.trackSid, participant.identity);
+                console.log('🔊 Track unmuted:', participant.identity);
             });
 
-            // ✅ Handle track unsubscription
+            // Track unsubscription
             r.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
                 if (track.kind === 'audio') {
                     console.log('🔇 Agent audio unsubscribed:', participant.identity);
-                    setRemoteStream(null);
                 }
             });
 
@@ -135,17 +125,16 @@ const VoiceAgent = () => {
                 }
             });
 
-            // Room events
+            // Room connection events
             r.on(RoomEvent.Connected, () => {
                 console.log('✅ Room connected');
                 setConnected(true);
             });
 
-            r.on(RoomEvent.Disconnected, () => {
-                console.log('❌ Room disconnected');
+            r.on(RoomEvent.Disconnected, (reason) => {
+                console.log('❌ Room disconnected, reason:', reason);
                 setConnected(false);
                 setActiveSpeaker('Nobody');
-                setRemoteStream(null);
             });
 
             r.on(RoomEvent.Reconnecting, () => {
@@ -169,7 +158,7 @@ const VoiceAgent = () => {
                 console.log('👤 Participant disconnected:', participant.identity);
             });
 
-            // Data received (agent might send text)
+            // Data messages
             r.on(RoomEvent.DataReceived, (payload, participant) => {
                 const text = new TextDecoder().decode(payload);
                 console.log('💬 Data from', participant?.identity, ':', text);
@@ -184,14 +173,19 @@ const VoiceAgent = () => {
             setLocalTrack(track);
             console.log('🎤 Local audio track created');
 
-            // Connect with local track
-            await r.connect(LIVEKIT_URL, token, { tracks: [track] });
-            console.log('✅ Connected with local track');
+            // Connect to room with local track
+            await r.connect(LIVEKIT_URL, token);
+            console.log('✅ Connected to room');
+
+            // Publish local audio track
+            await r.localParticipant.publishTrack(track);
+            console.log('✅ Local track published');
 
             setRoom(r);
         } catch (err: any) {
             console.error('LiveKit connection error:', err);
             Alert.alert('Connection Error', err.message);
+            await stopAudioSession();
         }
     };
 
@@ -233,23 +227,26 @@ const VoiceAgent = () => {
     };
 
     // Disconnect button
-    const handleDisconnect = () => {
+    const handleDisconnect = async () => {
         if (room) {
-            // Clean up local track
+            // Stop local track
             if (localTrack) {
                 localTrack.stop();
             }
 
+            // Disconnect from room
             room.disconnect();
             setRoom(null);
             setConnected(false);
             setActiveSpeaker('Nobody');
             setLocalTrack(null);
-            setRemoteStream(null);
+
+            // Stop audio session
+            await stopAudioSession();
         }
     };
 
-    // Mute/unmute
+    // Mute/unmute microphone
     const handleMuteToggle = () => {
         if (localTrack) {
             if (muted) {
@@ -262,6 +259,37 @@ const VoiceAgent = () => {
         }
     };
 
+    // Toggle speaker/earpiece
+    const toggleSpeaker = async () => {
+        try {
+            const newState = !speakerOn;
+
+            await AudioSession.configureAudio({
+                android: {
+                    preferredOutputList: newState ? ['speaker'] : ['earpiece'],
+                },
+                ios: {
+                    defaultToSpeaker: newState,
+                }
+            });
+
+            setSpeakerOn(newState);
+            console.log('🔊 Audio output:', newState ? 'Speaker' : 'Earpiece');
+        } catch (err) {
+            console.error('❌ Error toggling speaker:', err);
+        }
+    };
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (room) {
+                room.disconnect();
+            }
+            stopAudioSession();
+        };
+    }, [room]);
+
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Voice Agent</Text>
@@ -269,23 +297,11 @@ const VoiceAgent = () => {
 
             {connected && (
                 <>
-                    <Text style={styles.speaker}>🗣️ {activeSpeaker}</Text>
-                    {remoteStream && (
-                        <Text style={styles.debug}>
-                            Stream: {remoteStream.active ? '✅ Active' : '❌ Inactive'}
-                        </Text>
-                    )}
+                    <Text style={styles.speaker}>🗣️ Active: {activeSpeaker}</Text>
+                    <Text style={styles.debug}>
+                        Output: {speakerOn ? '🔊 Speaker' : '📱 Earpiece'}
+                    </Text>
                 </>
-            )}
-
-            {/* Hidden RTCView for audio playback - CRITICAL for audio routing */}
-            {remoteStream && (
-                <RTCView
-                    streamURL={remoteStream.toURL()}
-                    style={{ width: 1, height: 1, position: 'absolute' }}
-                    objectFit="cover"
-                    mirror={false}
-                />
             )}
 
             <View style={styles.buttonContainer}>
@@ -307,11 +323,19 @@ const VoiceAgent = () => {
                     disabled={!connected}
                     color="#2196F3"
                 />
+                <Button
+                    title={speakerOn ? '📱 Earpiece' : '🔊 Speaker'}
+                    onPress={toggleSpeaker}
+                    disabled={!connected}
+                    color="#FF9800"
+                />
             </View>
         </View>
     );
 }
+
 export default VoiceAgent;
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
