@@ -16,6 +16,7 @@ import { Animated as RNAnimated } from 'react-native';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import AlliChatScreen from './components/AlliChatScreen';
 import VoiceAgent from './components/VoiceAgent';
+import BarVisualizer from './components/BarVisualizer';
 // import { registerGlobals } from 'react-native-webrtc'; // ← Use this, not @livekit version
 
 // registerGlobals();
@@ -697,7 +698,9 @@ function AlliScreen() {
 function VoiceAgentScreen() {
   return <VoiceAgent />
 }
-
+function BarVisualizerScreen() {
+  return <BarVisualizer />
+}
 function GoalsScreen() {
   return (
     <View style={styles.centered}>
@@ -746,6 +749,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
           tabBarButton: (props) => <AlliTabBarButton {...props} />,
         }}
       />
+      <Tab.Screen name="BarVisualizer" component={BarVisualizerScreen} />
       <Tab.Screen name="VoiceAgent" component={VoiceAgentScreen} />
       <Tab.Screen name="Goals" component={GoalsScreen} />
       <Tab.Screen name="Account">
