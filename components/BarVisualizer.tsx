@@ -624,7 +624,7 @@ const VoiceAgentVisualizer = () => {
             {/* Header / HUD Top */}
             <View style={styles.header}>
                 <View style={styles.hudLine} />
-                <Text style={styles.appTitle}>SYSTEM: ONLINE</Text>
+                <Text style={styles.appTitle}>Alli: ONLINE</Text>
                 <View style={styles.hudLine} />
                 <TouchableOpacity
                     style={[styles.modeSwitch, { borderColor: stateInfo.color }]}
