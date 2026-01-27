@@ -698,9 +698,8 @@ function AlliScreen() {
 // function VoiceAgentScreen() {
 //   return <VoiceAgent />
 // }
-function BarVisualizerScreen() {
-  return <BarVisualizer />
-}
+// 
+
 function GoalsScreen() {
   return (
     <View style={styles.centered}>
@@ -751,7 +750,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
           tabBarButton: (props) => <AlliTabBarButton {...props} />,
         }}
       />
-      <Tab.Screen name="BarVisualizer" component={BarVisualizerScreen} />
+      {/* <Tab.Screen name="BarVisualizer" component={BarVisualizerScreen} /> */}
       {/* <Tab.Screen name="VoiceAgent" component={VoiceAgentScreen} /> */}
       <Tab.Screen name="Goals" component={GoalsScreen} />
       <Tab.Screen name="Account">
@@ -925,9 +924,12 @@ export default function App() {
           {!isLoggedIn ? (
             <RootStack.Screen name="Auth" component={AuthStack} />
           ) : (
-            <RootStack.Screen name="MainApp">
-              {() => <MainTabNavigator onLogout={handleLogout} />}
-            </RootStack.Screen>
+            <>
+              <RootStack.Screen name="MainApp">
+                {() => <MainTabNavigator onLogout={handleLogout} />}
+              </RootStack.Screen>
+              <RootStack.Screen name="BarVisualizer" component={BarVisualizer} />
+            </>
           )}
         </RootStack.Navigator>
       </View>

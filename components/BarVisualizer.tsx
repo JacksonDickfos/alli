@@ -32,17 +32,17 @@ type AgentState = 'connecting' | 'initializing' | 'listening' | 'speaking' | 'th
 const getStateColor = (state: AgentState) => {
     switch (state) {
         case 'connecting':
-            return { primary: '#00f3ff', secondary: '#007ca3' }; // Cyan
+            return { primary: '#0891b2', secondary: '#0e7490' }; // Cyan 600/700
         case 'initializing':
-            return { primary: '#b026ff', secondary: '#5e008f' }; // Electric Purple
+            return { primary: '#9333ea', secondary: '#7e22ce' }; // Purple 600/700
         case 'listening':
-            return { primary: '#00ff9d', secondary: '#008f58' }; // Neon Green
+            return { primary: '#059669', secondary: '#047857' }; // Emerald 600/700
         case 'speaking':
-            return { primary: '#ff0055', secondary: '#990033' }; // Neon Red/Pink
+            return { primary: '#dc2626', secondary: '#b91c1c' }; // Red 600/700
         case 'thinking':
-            return { primary: '#ffea00', secondary: '#b39500' }; // Electric Yellow
+            return { primary: '#ca8a04', secondary: '#a16207' }; // Yellow 600/700
         default:
-            return { primary: '#5c6c7f', secondary: '#2a3b4c' }; // Slate Gray
+            return { primary: '#475569', secondary: '#334155' }; // Slate 600/700
     }
 };
 
@@ -727,7 +727,7 @@ export default VoiceAgentVisualizer;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050510',
+        backgroundColor: '#FFFFFF',
         padding: 20,
     },
     header: {
@@ -743,13 +743,13 @@ const styles = StyleSheet.create({
     hudLine: {
         flex: 1,
         height: 1,
-        backgroundColor: 'rgba(0, 243, 255, 0.3)',
+        backgroundColor: 'rgba(8, 145, 178, 0.3)',
         marginHorizontal: 10,
     },
     appTitle: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#00f3ff',
+        color: '#0891b2',
         letterSpacing: 2,
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
@@ -758,14 +758,14 @@ const styles = StyleSheet.create({
         height: 40,
         borderRadius: 4,
         borderWidth: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: '#f1f5f9',
         justifyContent: 'center',
         alignItems: 'center',
-        borderColor: '#fff',
+        borderColor: '#cbd5e1',
     },
     modeSwitchText: {
         fontSize: 16,
-        color: '#fff',
+        color: '#334155',
         fontWeight: 'bold',
     },
     visualizerSection: {
@@ -773,17 +773,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(0,0,0,0.1)',
         borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: '#f8fafc',
         padding: 20,
         marginBottom: 20,
     },
     stateIcon: {
         fontSize: 32,
         marginBottom: 30,
-        color: '#00f3ff',
-        textShadowColor: 'rgba(0, 243, 255, 0.8)',
+        color: '#0891b2',
+        textShadowColor: 'rgba(8, 145, 178, 0.2)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },
@@ -862,17 +862,17 @@ const styles = StyleSheet.create({
     stateLabel: {
         fontSize: 24,
         fontWeight: '900',
-        color: '#ffffff',
+        color: '#1e293b',
         marginTop: 40,
         letterSpacing: 4,
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
     stateSublabel: {
         fontSize: 12,
-        color: '#00f3ff',
+        color: '#0891b2',
         marginTop: 5,
         letterSpacing: 2,
-        opacity: 0.7,
+        opacity: 0.8,
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
     audioLevelContainer: {
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
     },
     audioLevelBar: {
         height: 4,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
         borderRadius: 2,
         overflow: 'hidden',
         borderWidth: 1,
@@ -891,12 +891,12 @@ const styles = StyleSheet.create({
         borderRadius: 2,
     },
     statusCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: '#f8fafc',
         borderRadius: 16,
         padding: 20,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(0, 0, 0, 0.05)',
     },
     statusRow: {
         flexDirection: 'row',
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
     statusValue: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#e2e8f0',
+        color: '#334155',
     },
     controls: {
         gap: 12,
@@ -959,13 +959,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 16,
         borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: '#f1f5f9',
         gap: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderColor: '#e2e8f0',
     },
     smallButtonActive: {
-        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        backgroundColor: '#fee2e2',
         borderColor: '#ef4444',
     },
     smallButtonIcon: {
@@ -974,6 +974,6 @@ const styles = StyleSheet.create({
     smallButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#ffffff',
+        color: '#334155',
     },
 });

@@ -26,6 +26,7 @@ import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import Voice from '@react-native-voice/voice';
 import { useNavigation } from '@react-navigation/native';
+import BarVisualizer from '../components/BarVisualizer';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -254,6 +255,10 @@ const markdownStyles = StyleSheet.create({
     height: 6,
   },
 });
+
+function BarVisualizerScreen() {
+  return <BarVisualizer />
+}
 
 // Typing indicator dots animation
 function TypingIndicator() {
