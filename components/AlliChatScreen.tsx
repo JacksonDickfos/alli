@@ -14,6 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import { isSupabaseConfigured, supabase, supabaseConfigError } from '../lib/supa
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import Voice from '@react-native-voice/voice';
+import { useNavigation } from '@react-navigation/native';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -334,6 +336,7 @@ function CopyButton({ content }: { content: string }) {
 }
 
 export default function AlliChatScreen() {
+  const navigation = useNavigation<any>();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
@@ -919,18 +922,17 @@ export default function AlliChatScreen() {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={toggleVoiceInput}
+
+                onPress={() => navigation.navigate('BarVisualizer')}
                 style={[styles.micBtn, isListening && styles.micBtnActive]}
               >
-                <Ionicons
-                  name={isListening ? "mic" : "mic-outline"}
-                  size={20}
-                  color="#fff"
+                <Image
+                  source={require('../assets/voice.png')}
+                  style={{ width: 24, height: 24, resizeMode: 'stretch' }}
                 />
+
               </TouchableOpacity>
-              {/* <TouchableOpacity onPress={startListening} style={styles.micBtn}>
-                <Ionicons name="mic" size={20} color="#fff" />
-              </TouchableOpacity> */}
+
 
             </View>
             <Text style={styles.disclaimer}>
@@ -1216,7 +1218,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#6B7280',
+    // backgroundColor: '#6B7280',
+    backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
   },

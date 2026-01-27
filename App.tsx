@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import AlliChatScreen from './components/AlliChatScreen';
-import VoiceAgent from './components/VoiceAgent';
+// import VoiceAgent from './components/VoiceAgent';
 import BarVisualizer from './components/BarVisualizer';
 // import { registerGlobals } from 'react-native-webrtc'; // ← Use this, not @livekit version
 
@@ -695,9 +695,9 @@ function AlliScreen() {
   return <AlliChatScreen />;
 
 }
-function VoiceAgentScreen() {
-  return <VoiceAgent />
-}
+// function VoiceAgentScreen() {
+//   return <VoiceAgent />
+// }
 function BarVisualizerScreen() {
   return <BarVisualizer />
 }
@@ -728,6 +728,8 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
           } else if (route.name === 'Alli') {
             // Icon handled by custom tabBarButton
             return null;
+          } else if (route.name === 'BarVisualizer') {
+            return <Ionicons name="mic-circle" size={size} color={color} />;
           } else if (route.name === 'Goals') {
             return <MaterialCommunityIcons name="target" size={size} color={color} />;
           } else if (route.name === 'Account') {
@@ -750,7 +752,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         }}
       />
       <Tab.Screen name="BarVisualizer" component={BarVisualizerScreen} />
-      <Tab.Screen name="VoiceAgent" component={VoiceAgentScreen} />
+      {/* <Tab.Screen name="VoiceAgent" component={VoiceAgentScreen} /> */}
       <Tab.Screen name="Goals" component={GoalsScreen} />
       <Tab.Screen name="Account">
         {() => <AccountScreen onLogout={onLogout} />}
