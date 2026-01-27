@@ -30,20 +30,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 type AgentState = 'connecting' | 'initializing' | 'listening' | 'speaking' | 'thinking';
 
 const getStateColor = (state: AgentState) => {
-    switch (state) {
-        case 'connecting':
-            return { primary: '#0891b2', secondary: '#0e7490' }; // Cyan 600/700
-        case 'initializing':
-            return { primary: '#9333ea', secondary: '#7e22ce' }; // Purple 600/700
-        case 'listening':
-            return { primary: '#059669', secondary: '#047857' }; // Emerald 600/700
-        case 'speaking':
-            return { primary: '#dc2626', secondary: '#b91c1c' }; // Red 600/700
-        case 'thinking':
-            return { primary: '#ca8a04', secondary: '#a16207' }; // Yellow 600/700
-        default:
-            return { primary: '#475569', secondary: '#334155' }; // Slate 600/700
-    }
+    // Using the requested beige theme for all states
+    return { primary: '#B9A68D', secondary: '#968571' };
 };
 
 // Futuristic Tech Orb Visualizer
@@ -747,9 +735,10 @@ const styles = StyleSheet.create({
         marginHorizontal: 10,
     },
     appTitle: {
+
         fontSize: 18,
         fontWeight: '900',
-        color: '#0891b2',
+        color: '#B9A68D',
         letterSpacing: 2,
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
@@ -782,8 +771,8 @@ const styles = StyleSheet.create({
     stateIcon: {
         fontSize: 32,
         marginBottom: 30,
-        color: '#0891b2',
-        textShadowColor: 'rgba(8, 145, 178, 0.2)',
+        color: '#B9A68D',
+        textShadowColor: 'rgba(185, 166, 141, 0.2)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },
@@ -869,7 +858,7 @@ const styles = StyleSheet.create({
     },
     stateSublabel: {
         fontSize: 12,
-        color: '#0891b2',
+        color: '#B9A68D',
         marginTop: 5,
         letterSpacing: 2,
         opacity: 0.8,
@@ -925,6 +914,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     bigButton: {
+        backgroundColor: '#B9A68D',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -938,7 +928,7 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     connectButton: {
-        backgroundColor: '#10b981',
+        backgroundColor: '#B9A68D',
     },
     endButton: {
         backgroundColor: '#ef4444',
