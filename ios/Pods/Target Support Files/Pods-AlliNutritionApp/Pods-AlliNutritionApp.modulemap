@@ -1,0 +1,6 @@
+module Pods_AlliNutritionApp {
+  umbrella header "Pods-AlliNutritionApp-umbrella.h"
+
+  export *
+  module * { export * }
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Expo QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .url {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .qr-placeholder {
+            width: 200px;
+            height: 200px;
+            background: #f0f0f0;
+            border: 2px dashed #ccc;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Expo Tunnel QR Code</h2>
+        <p>Scan this QR code with your phone's camera or Expo Go:</p>
+        
+        <div class="qr-placeholder">
+            QR Code Loading...
+        </div>
+        
+        <div class="url">
+            <strong>URL:</strong><br>
+            exp://q9elwfy-anonymous-8082.exp.direct
+        </div>
+        
+        <div class="timestamp">
+            Generated: <span id="timestamp"></span>
+        </div>
+    </div>
+
+    <script>
+        // Add timestamp
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        // Try to load QR code library
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+        script.onload = function() {
+            const qrDiv = document.querySelector('.qr-placeholder');
+            qrDiv.innerHTML = '';
+            QRCode.toCanvas(qrDiv, 'exp://q9elwfy-anonymous-8082.exp.direct', {
+                width: 200,
+                margin: 2
+            });
+        };
+        script.onerror = function() {
+            document.querySelector('.qr-placeholder').innerHTML = 
+                'QR Code failed to load.<br>Use the URL below instead.';
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html> 

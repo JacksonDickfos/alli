@@ -1,0 +1,15 @@
+EXPO TUNNEL URL
+================
+
+URL: exp://q9elwfy-anonymous-8082.exp.direct
+
+Generated: 29/07/2025, 13:18:35
+
+INSTRUCTIONS:
+1. Open Expo Go on your phone
+2. The app should automatically detect and open this URL
+3. If not, try scanning any QR code from the terminal
+
+For your business partner:
+- Send them this URL: exp://q9elwfy-anonymous-8082.exp.direct
+- They can open it directly in their Expo Go app 

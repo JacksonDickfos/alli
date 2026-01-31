@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Alli Nutrition App",
+    "slug": "alli-nutrition-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to camera to take photos of food for nutrition analysis."
+      },
+      "bundleIdentifier": "com.abdullah-786.allinutritionapp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.abdullah_786.allinutritionapp"
+    },
+    "web": {
+      "template": "./web/index.html",
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Alli to access your camera to take photos of food for nutrition analysis."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Alli to access your photos to select food images for nutrition analysis."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a36aadaa-3c5d-41a2-85fd-2020fbb19dab"
+      }
+    }
+  }
+}

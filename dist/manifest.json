@@ -1,0 +1,20 @@
+{
+  "name": "Alli Nutrition App",
+  "short_name": "Alli",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#B9A68D",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png", 
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
