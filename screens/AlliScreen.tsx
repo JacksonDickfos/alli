@@ -851,7 +851,7 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
                     <View style={styles.pulseRing}>
                       <View style={styles.pulseInner}>
                         <Image
-                          source={require('../assets/alli-logo.png')}
+                          source={require("../assets/logo.png")}
                           style={styles.heroImage}
                         />
                       </View>
