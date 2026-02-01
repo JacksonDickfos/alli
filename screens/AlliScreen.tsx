@@ -97,6 +97,26 @@ function TypingIndicator() {
   );
 }
 
+const Typewriter = ({ text }: { text: string }) => {
+  const [displayed, setDisplayed] = useState('');
+
+  useEffect(() => {
+    setDisplayed('');
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        setDisplayed(prev => prev + text.charAt(i));
+        i++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 15); // Adjust speed here
+    return () => clearInterval(timer);
+  }, [text]);
+
+  return <Text style={styles.aiMessageText}>{displayed}</Text>;
+};
+
 interface AlliScreenProps {
   navigation: any;
 }
@@ -626,7 +646,7 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
   };
 
   // ===== RENDER FUNCTIONS =====
-  const renderMessage = (message: Message) => {
+  const renderMessage = (message: Message, isLast: boolean) => {
     if (message.pending && !message.isUser) {
       return (
         <View key={message.id} style={[styles.messageContainer, styles.aiMessage]}>
@@ -648,14 +668,18 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
             message.isUser ? styles.userBubble : styles.aiBubble,
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              message.isUser ? styles.userMessageText : styles.aiMessageText,
-            ]}
-          >
-            {message.text}
-          </Text>
+          {isLast && !message.isUser ? (
+            <Typewriter text={message.text} />
+          ) : (
+            <Text
+              style={[
+                styles.messageText,
+                message.isUser ? styles.userMessageText : styles.aiMessageText,
+              ]}
+            >
+              {message.text}
+            </Text>
+          )}
           <Text
             style={[
               styles.timestamp,
@@ -820,11 +844,25 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
                 ref={scrollViewRef}
                 style={styles.messagesContainer}
                 contentContainerStyle={styles.messagesContent}
-                showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
               >
-                {messages.map(renderMessage)}
+                {messages.length === 0 ? (
+                  <View style={styles.centerHeroContainer}>
+                    <View style={styles.pulseRing}>
+                      <View style={styles.pulseInner}>
+                        <Image
+                          source={require('../assets/alli-logo.png')}
+                          style={styles.heroImage}
+                        />
+                      </View>
+                    </View>
+                    <Text style={styles.statusText}>{getStateText()}</Text>
+                    {renderQuickSuggestions()}
+                  </View>
+                ) : (
+                  messages.map((message, index) => renderMessage(message, index === messages.length - 1))
+                )}
               </ScrollView>
-
               {/* Quick Suggestions */}
               {messages.length <= 1 && renderQuickSuggestions()}
 
