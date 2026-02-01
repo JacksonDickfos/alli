@@ -22,6 +22,9 @@ import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../lib/supabase';
 
+// ⚠️ Voice/WebSocket features disabled to prevent connection errors
+// To enable: set up WebSocket server and configure EXPO_PUBLIC_WEBSOCKET_URL in .env
+
 type ChatRole = 'system' | 'user' | 'assistant';
 
 type ChatMessage = {
@@ -41,8 +44,10 @@ type Conversation = {
 const TABLE_CONVERSATIONS = 'alli_ai_conversations';
 const TABLE_MESSAGES = 'alli_ai_messages';
 
-const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined) || 'http://localhost:3001';
-const BACKEND_API_KEY = process.env.EXPO_PUBLIC_BACKEND_API_KEY as string | undefined;
+const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
+const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
+const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
+const RAG_FALLBACK_URL = process.env.EXPO_PUBLIC_RAG_FALLBACK_URL;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(320, SCREEN_WIDTH * 0.85);
@@ -196,7 +201,6 @@ const markdownStyles = StyleSheet.create({
   ordered_list_content: {
     flex: 1,
   },
-  // Table styles - simplified for better rendering
   table: {
     marginVertical: 14,
     borderRadius: 10,
@@ -318,10 +322,10 @@ function CopyButton({ content }: { content: string }) {
 
   return (
     <TouchableOpacity onPress={handleCopy} style={styles.copyButton}>
-      <Ionicons 
-        name={copied ? 'checkmark-circle' : 'copy-outline'} 
-        size={18} 
-        color={copied ? '#10B981' : '#9CA3AF'} 
+      <Ionicons
+        name={copied ? 'checkmark-circle' : 'copy-outline'}
+        size={18}
+        color={copied ? '#10B981' : '#9CA3AF'}
       />
       <Text style={[styles.copyButtonText, copied && styles.copyButtonTextCopied]}>
         {copied ? 'Copied!' : 'Copy'}
@@ -557,23 +561,58 @@ export default function AlliChatScreen() {
         .filter(m => m.content && m.content !== '…')
         .map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch(`${BACKEND_URL}/chat`, {
+      const systemPrompt = "you are a specialized nutritionist, give short answers about the questions user asks";
+      const messagesToSend = [
+        { role: 'system' as const, content: systemPrompt },
+        ...historyPayload
+      ];
+
+      let assistantText = '';
+
+      // Try Novita API first
+      let res = await fetch(NOVITA_API_URL as string, {
         method: 'POST',
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          ...(BACKEND_API_KEY ? { 'x-api-key': BACKEND_API_KEY } : {}),
+          'Authorization': `Bearer ${NOVITA_API_KEY}`,
         },
-        body: JSON.stringify({ messages: historyPayload }),
+        body: JSON.stringify({
+          model: NOVITA_MODEL,
+          messages: messagesToSend,
+          temperature: 0.3,
+          max_tokens: 800,
+          reasoning: { enabled: false }
+        }),
       });
 
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(json?.error || `Chat request failed (${res.status})`);
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
       }
 
-      const assistantText = String(json?.message?.content || '').trim();
-      if (!assistantText) throw new Error('Empty model response');
+      // Fallback to RAG if Novita failed or returned empty content
+      if (!assistantText && RAG_FALLBACK_URL) {
+        try {
+          console.log('Falling back to RAG endpoint...');
+          const ragRes = await fetch(RAG_FALLBACK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: text }),
+          });
+
+          if (ragRes.ok) {
+            const ragJson = await ragRes.json().catch(() => ({}));
+            assistantText = String(ragJson.output || ragJson.response || ragJson.text || ragJson.message || (typeof ragJson === 'string' ? ragJson : '')).trim();
+          }
+        } catch (ragErr) {
+          console.error('RAG Fallback failed:', ragErr);
+        }
+      }
+
+      if (!assistantText) {
+        throw new Error('All assistants failed to respond. Please try again later.');
+      }
 
       const insertedAssistant = await supabase
         .from(TABLE_MESSAGES)
@@ -957,7 +996,7 @@ const styles = StyleSheet.create({
 
   // Messages
   messagesList: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20 },
-  
+
   // User message - right aligned bubble
   userMessageContainer: {
     alignItems: 'flex-end',

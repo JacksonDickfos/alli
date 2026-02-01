@@ -38,7 +38,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <string>1</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -55,9 +55,7 @@
     <key>NSCameraUsageDescription</key>
     <string>Allow Alli to access your camera to take photos of food for nutrition analysis.</string>
     <key>NSFaceIDUsageDescription</key>
-    <string>Alli uses Face ID for secure and quick authentication.</string>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>Alli needs local network access to connect to the real-time AI service.</string>
+    <string>Allow $(PRODUCT_NAME) to use Face ID</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app needs access to your microphone to enable voice interactions with the AI assistant.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
@@ -66,11 +64,8 @@
     <string>Allow Alli to access your photos to select food images for nutrition analysis.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>This app needs access to speech recognition to transcribe your voice questions.</string>
-    <key>UIBackgroundModes</key>
-    <array>
-      <string>voip</string>
-      <string>audio</string>
-    </array>
+    <key>RCTNewArchEnabled</key>
+    <true/>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

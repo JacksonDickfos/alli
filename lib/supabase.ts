@@ -10,17 +10,30 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const supabaseConfigError =
   'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (Expo public env vars).';
 
+// Log the configuration status
+console.log('🔧 Supabase Configuration:', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
+  configured: isSupabaseConfigured
+});
+
 if (!isSupabaseConfigured) {
-  // eslint-disable-next-line no-console
-  console.warn(supabaseConfigError);
+  console.error('❌ ' + supabaseConfigError);
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+// Don't create client with empty strings - throw error instead
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Supabase URL and Anon Key are required!');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Persist sessions on native. On web, supabase-js uses localStorage by default.
     storage: Platform.OS === 'web' ? undefined : (AsyncStorage as any),
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: Platform.OS === 'web',
   },
-}); 
+});
+
+console.log('✅ Supabase client created successfully');

@@ -95,11 +95,11 @@ function SignUpScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email: trimmedEmail, 
-        password: trimmedPassword 
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword
       });
-      
+
       if (error) {
         console.error('Signup error:', error);
         setNotice({ text: error.message, type: 'error' });
@@ -144,9 +144,9 @@ function SignUpScreen({ navigation, onAuth }: any) {
         value={password}
         onChangeText={setPassword}
       />
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.buttonDisabled]} 
-        onPress={handleSignUp} 
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSignUp}
         disabled={loading}
       >
         <Text style={styles.buttonText}>
@@ -168,7 +168,7 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [savedCredentials, setSavedCredentials] = useState<{email: string, password: string} | null>(null);
+  const [savedCredentials, setSavedCredentials] = useState<{ email: string, password: string } | null>(null);
   const [isDevMode, setIsDevMode] = useState(__DEV__);
 
   useEffect(() => {
@@ -194,17 +194,17 @@ function LoginScreen({ navigation, onAuth }: any) {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        
+
         console.log('Biometric check:', { hasHardware, isEnrolled, supportedTypes });
-        
+
         // Check specifically for Face ID (type 2) or Touch ID (type 1)
         const hasFaceID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
         const hasTouchID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
-        
+
         if (hasHardware && isEnrolled && (hasFaceID || hasTouchID)) {
           setBiometricAvailable(true);
           console.log('✅ Biometric authentication available:', hasFaceID ? 'Face ID' : 'Touch ID');
-          
+
           // Load saved credentials
           const savedEmail = await AsyncStorage.getItem('savedEmail');
           const savedPassword = await AsyncStorage.getItem('savedPassword');
@@ -226,7 +226,7 @@ function LoginScreen({ navigation, onAuth }: any) {
         console.log('❌ Biometric check error:', error);
       }
     };
-    
+
     checkBiometric();
   }, []);
 
@@ -239,11 +239,11 @@ function LoginScreen({ navigation, onAuth }: any) {
     setLoading(true);
     try {
       // Quick login without biometric - just use saved credentials
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: savedCredentials.email, 
-        password: savedCredentials.password 
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: savedCredentials.email,
+        password: savedCredentials.password
       });
-      
+
       if (error) {
         console.error('Quick login error:', error);
         setNotice({ text: error.message, type: 'error' });
@@ -288,11 +288,11 @@ function LoginScreen({ navigation, onAuth }: any) {
 
       if (result.success) {
         // Use saved credentials to log in
-        const { data, error } = await supabase.auth.signInWithPassword({ 
-          email: savedCredentials.email, 
-          password: savedCredentials.password 
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: savedCredentials.email,
+          password: savedCredentials.password
         });
-        
+
         if (error) {
           console.error('Face ID login error:', error);
           setNotice({ text: error.message, type: 'error' });
@@ -370,33 +370,51 @@ function LoginScreen({ navigation, onAuth }: any) {
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: trimmedPassword });
+      console.log('🔐 Attempting login...', { email: trimmedEmail });
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword
+      });
+
+      console.log('📊 Login response:', { hasData: !!data, hasError: !!error, hasSession: !!data?.session });
+
       if (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         setNotice({ text: error.message, type: 'error' });
         Alert.alert('Login failed', error.message);
       } else if (data.session) {
+        console.log('✅ Login successful, saving tokens...');
+
         await AsyncStorage.setItem('token', data.session.access_token);
         await AsyncStorage.setItem('isLoggedIn', 'true');
         // Save credentials for Face ID
         await AsyncStorage.setItem('savedEmail', trimmedEmail);
         await AsyncStorage.setItem('savedPassword', trimmedPassword);
+
+        console.log('✅ Tokens saved, calling onAuth...');
         setNotice({ text: 'Logged in successfully.', type: 'success' });
         onAuth();
         Alert.alert('Success', 'Logged in!');
       } else {
+        console.error('⚠️ No session returned');
         setNotice({ text: 'Unexpected error logging in.', type: 'error' });
         Alert.alert('Error', 'Unexpected error logging in.');
       }
     } catch (err) {
-      console.error('Login catch error:', err);
-      setNotice({ text: 'Unexpected error logging in.', type: 'error' });
-      Alert.alert('Error', 'Unexpected error logging in.');
+      // THIS IS WHERE IT'S FAILING - Log the actual error
+      console.error('❌ Login catch error:', err);
+      console.error('❌ Error details:', {
+        message: err?.message,
+        name: err?.name,
+        stack: err?.stack
+      });
+      setNotice({ text: `Login error: ${err?.message || 'Unknown error'}`, type: 'error' });
+      Alert.alert('Error', `Unexpected error: ${err?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
-
   const handleForgotPassword = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -446,9 +464,9 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handlePerformReset} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handlePerformReset}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
@@ -475,35 +493,35 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
               {loading ? 'Logging In...' : 'Log In'}
             </Text>
           </TouchableOpacity>
-          
+
           {biometricAvailable && savedCredentials && (
-            <TouchableOpacity 
-              style={[styles.faceIdButton, loading && styles.buttonDisabled]} 
-              onPress={handleFaceIDLogin} 
+            <TouchableOpacity
+              style={[styles.faceIdButton, loading && styles.buttonDisabled]}
+              onPress={handleFaceIDLogin}
               disabled={loading}
             >
-              <Ionicons name="face-id" size={24} color="white" style={{ marginRight: 8 }} />
+              <Ionicons name="finger-print" size={24} color="white" style={{ marginRight: 8 }} />
               <Text style={styles.buttonText}>
                 {loading ? 'Authenticating...' : 'Log In with Face ID'}
               </Text>
             </TouchableOpacity>
           )}
-          
+
           {/* Quick Login button - shows in dev mode (simulator) when credentials are saved */}
           {/* Shows even if Face ID is available, so you have both options in dev */}
           {isDevMode && savedCredentials && (
-            <TouchableOpacity 
-              style={[styles.quickLoginButton, loading && styles.buttonDisabled]} 
-              onPress={handleQuickLogin} 
+            <TouchableOpacity
+              style={[styles.quickLoginButton, loading && styles.buttonDisabled]}
+              onPress={handleQuickLogin}
               disabled={loading}
             >
               <Ionicons name="flash" size={24} color="white" style={{ marginRight: 8 }} />
@@ -512,7 +530,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
           <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
         </>
@@ -573,7 +591,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         tabBarIcon: ({ color, size, focused }) => {
           const iconSize = size * 0.9; // Reduce by 10%
           const iconStyle = { marginTop: -5 }; // Move icons up 5px
-          
+
           if (route.name === 'Home') {
             return <MaterialCommunityIcons name="weather-sunset" size={iconSize} color={color} style={iconStyle} />;
           } else if (route.name === 'Nutrition') {
@@ -601,13 +619,13 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{ tabBarLabel: 'Today' }}
       />
-      <Tab.Screen 
-        name="Nutrition" 
+      <Tab.Screen
+        name="Nutrition"
         component={NutritionScreen}
         options={{ tabBarLabel: 'Diary' }}
       />
@@ -616,15 +634,15 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         component={AlliScreen}
         options={{
           tabBarLabel: 'Alli',
-          tabBarButton: (props) => <AlliTabBarButton {...props} />, 
+          tabBarButton: (props) => <AlliTabBarButton {...props} />,
         }}
       />
-      <Tab.Screen 
-        name="Plan" 
+      <Tab.Screen
+        name="Plan"
         component={ComingSoonScreen}
         options={{ tabBarLabel: 'Plan' }}
       />
-      <Tab.Screen 
+      <Tab.Screen
         name="Menu"
         options={{ tabBarLabel: 'More' }}
       >
@@ -688,7 +706,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
       >
         <RNAnimated.View style={{ transform: [{ scale }], opacity }}>
           <LinearGradient
-            colors={[ '#4F8EF7', '#8A2BE2', '#FF3B30' ]}
+            colors={['#4F8EF7', '#8A2BE2', '#FF3B30']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
@@ -768,9 +786,9 @@ export default function App() {
           console.log('Token refresh error (non-critical):', error.message);
           // DON'T log out - keep user logged in even if token refresh fails
           // Only log out if it's a real authentication failure
-          if (error.message.includes('Invalid JWT') || 
-              error.message.includes('Token expired') ||
-              error.message.includes('Invalid token')) {
+          if (error.message.includes('Invalid JWT') ||
+            error.message.includes('Token expired') ||
+            error.message.includes('Invalid token')) {
             console.log('Real auth failure - but keeping user logged in for now');
             // Don't actually log out - let them try again
           }
@@ -796,7 +814,7 @@ export default function App() {
         // BULLETPROOF AUTH: Always stay logged in unless explicitly logged out
         const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
         const autoLogin = process.env.EXPO_PUBLIC_AUTO_LOGIN === 'true';
-        
+
         if (savedAuthState === 'true' && autoLogin) {
           // User was logged in AND auto-login enabled, keep them logged in FOREVER
           console.log('✅ User was logged in (auto-login enabled), keeping them logged in permanently');
@@ -817,7 +835,7 @@ export default function App() {
         // Only check session if auto-login is enabled and no saved state
         const { data } = await supabase.auth.getSession();
         if (!isMounted) return;
-        
+
         if (data.session) {
           // Found a session, save it permanently
           await AsyncStorage.setItem('isLoggedIn', 'true');
@@ -830,7 +848,7 @@ export default function App() {
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (!isMounted) return;
-        
+
         // On ANY error, check saved state and keep user logged in
         const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
         if (savedAuthState === 'true') {
@@ -847,7 +865,7 @@ export default function App() {
     // SMART auth state change handler - handles both login status AND authentication
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, !!session);
-      
+
       if (event === 'SIGNED_IN' && session) {
         // User signed in - save permanently
         await AsyncStorage.setItem('isLoggedIn', 'true');
@@ -883,7 +901,7 @@ export default function App() {
             setUpdateAvailable(true);
           }
           localStorage.setItem(KEY, text);
-        } catch {}
+        } catch { }
       };
       check();
       interval = setInterval(check, 30000);
@@ -899,7 +917,7 @@ export default function App() {
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('isLoggedIn');
-    try { await supabase.auth.signOut(); } catch {}
+    try { await supabase.auth.signOut(); } catch { }
     setIsLoggedIn(false);
   };
 

@@ -31,7 +31,7 @@ export class RealtimeService {
   private proxyUrl =
     (process.env.EXPO_PUBLIC_REALTIME_PROXY_URL as string | undefined) ||
     (Constants.expoConfig?.extra as any)?.realtimeProxyUrl ||
-    (__DEV__ ? 'ws://192.168.4.29:8080/realtime' : '');
+    (__DEV__ ? 'ws://192.168.10.6:3002/realtime' : '');
   private sessionCreated = false; // Track if OpenAI session is ready
   private isOpenAIConnected = false; // Track if OpenAI is actually connected (via connection_status)
   private audioChunksSent = 0; // Track how many audio chunks were actually sent (not dropped)
@@ -55,9 +55,9 @@ export class RealtimeService {
     }
 
     console.log('🔌 Connecting to proxy:', this.proxyUrl);
-    
+
     this.ws = new WebSocket(this.proxyUrl);
-    
+
     this.ws.onopen = () => {
       console.log('✅ Connected to proxy');
       this.sessionCreated = false; // Reset session flag on new connection
@@ -136,7 +136,7 @@ export class RealtimeService {
     console.warn('⚠️ Using expo-av fallback (not real-time streaming)');
     const { granted } = await Audio.requestPermissionsAsync();
     if (!granted) throw new Error('Microphone permission denied');
-    
+
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
@@ -145,7 +145,7 @@ export class RealtimeService {
     const { recording } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.HIGH_QUALITY
     );
-    
+
     this.isRecording = true;
     console.log('✅ Recording started (expo-av fallback)');
   }
@@ -215,7 +215,7 @@ export class RealtimeService {
     try {
       // Log raw data for debugging
       console.log('📥 Raw message received:', typeof data, data?.toString?.()?.substring(0, 100) || String(data).substring(0, 100));
-      
+
       const msg = typeof data === 'string' ? JSON.parse(data) : data;
       const type = msg?.type;
 
@@ -288,7 +288,7 @@ export class RealtimeService {
           console.log('   Audio data length:', msg.audio ? String(msg.audio).length : 0);
           console.log('   Full message keys:', Object.keys(msg));
           console.log('   Message preview:', JSON.stringify(msg).substring(0, 200));
-          
+
           if (msg.audio) {
             console.log('✅ Enqueueing audio chunk (length:', String(msg.audio).length, ')');
             this.enqueueAudio(msg.audio);
@@ -377,14 +377,14 @@ export class RealtimeService {
       console.error('❌ Invalid base64 audio chunk format');
       return;
     }
-    
+
     // Log chunk size for debugging (base64 is ~33% larger than raw)
     const rawSize = Math.floor(base64Pcm.length * 0.75);
     const frameCount = rawSize / 2; // 16-bit = 2 bytes per sample
     const durationMs = (frameCount / 24000) * 1000; // 24kHz sample rate
-    
+
     console.log(`📤 Sending audio chunk: ${base64Pcm.length} bytes base64 (~${rawSize} bytes raw, ~${frameCount} frames, ~${durationMs.toFixed(1)}ms)`);
-    
+
     this.send({
       type: 'input_audio_buffer.append',
       audio: base64Pcm
@@ -407,12 +407,12 @@ export class RealtimeService {
     }
 
     console.log('📤 Flushing', this.audioChunkQueue.length, 'queued audio chunks');
-    
+
     // Send chunks with small delays to avoid overwhelming OpenAI
     let delay = 0;
     const chunks = [...this.audioChunkQueue]; // Copy array
     this.audioChunkQueue = []; // Clear queue
-    
+
     chunks.forEach((chunk, index) => {
       setTimeout(() => {
         if (this.isOpenAIConnected && this.sessionCreated) {
@@ -438,10 +438,10 @@ export class RealtimeService {
     console.log('   Queue length before:', this.audioQueue.length);
     console.log('   Currently playing:', this.isPlaying);
     console.log('   Audio data length:', base64Pcm ? String(base64Pcm).length : 0);
-    
+
     this.audioQueue.push(base64Pcm);
     console.log('   Queue length after:', this.audioQueue.length);
-    
+
     if (!this.isPlaying) {
       console.log('🎵 Starting playback (queue not playing)');
       this.playNext();
@@ -457,7 +457,7 @@ export class RealtimeService {
     console.log('▶️ playNext() called');
     console.log('   Queue length:', this.audioQueue.length);
     console.log('   Currently playing:', this.isPlaying);
-    
+
     if (this.audioQueue.length === 0) {
       console.log('⏹️ Queue empty, stopping playback');
       this.isPlaying = false;
@@ -469,13 +469,13 @@ export class RealtimeService {
     console.log('🎵 Playing audio chunk');
     console.log('   PCM data length:', base64Pcm ? String(base64Pcm).length : 0);
     console.log('   Remaining in queue:', this.audioQueue.length);
-    
+
     try {
       console.log('🔄 Converting PCM16 to WAV...');
       const wavData = this.pcm16ToWav(base64Pcm);
       console.log('✅ WAV conversion complete');
       console.log('   WAV data length:', wavData ? String(wavData).length : 0);
-      
+
       console.log('🔊 Creating Audio.Sound...');
       const { sound } = await Audio.Sound.createAsync(
         { uri: `data:audio/wav;base64,${wavData}` },

@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ 
+const wss = new WebSocket.Server({
   server,
   path: '/realtime'
 });
@@ -23,7 +23,7 @@ console.log('Proxy server starting...');
 
 wss.on('connection', (clientWs) => {
   console.log('✅ Client connected to proxy');
-  
+
   let openaiWs = null;
   let isConnected = false;
 
@@ -42,7 +42,7 @@ wss.on('connection', (clientWs) => {
     }
 
     console.log('Connecting to OpenAI Realtime API...');
-    
+
     // OpenAI Realtime API WebSocket endpoint
     // Note: Headers need to be passed in options object correctly for 'ws' library
     const openaiRealtimeUrl = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01';
@@ -60,7 +60,7 @@ wss.on('connection', (clientWs) => {
         console.error('❌ OpenAI WebSocket connection error:', error.message);
         console.error('Error details:', error);
         isConnected = false;
-        
+
         if (clientWs.readyState === WebSocket.OPEN) {
           clientWs.send(JSON.stringify({
             type: 'connection_status',
@@ -86,7 +86,7 @@ wss.on('connection', (clientWs) => {
     openaiWs.on('open', () => {
       console.log('✅ Connected to OpenAI Realtime API');
       isConnected = true;
-      
+
       // Send connection status to client
       if (clientWs.readyState === WebSocket.OPEN) {
         const statusMsg = JSON.stringify({
@@ -105,20 +105,20 @@ wss.on('connection', (clientWs) => {
         // Only forward valid, non-empty messages
         if (data && data.toString().trim() !== '') {
           const messageStr = data.toString();
-          
+
           // Skip empty objects and invalid JSON
-          if (messageStr !== '{}' && 
-              messageStr !== 'null' && 
-              messageStr !== 'undefined' &&
-              messageStr.length > 2) {
-            
+          if (messageStr !== '{}' &&
+            messageStr !== 'null' &&
+            messageStr !== 'undefined' &&
+            messageStr.length > 2) {
+
             // Validate it's proper JSON
             try {
               const parsed = JSON.parse(messageStr);
               if (parsed && typeof parsed === 'object') {
                 const msgType = parsed.type || 'unknown';
                 console.log('📤 Forwarding to client:', msgType);
-                
+
                 // Log all important events for debugging
                 if (msgType === 'error') {
                   console.error('❌ OpenAI error:', JSON.stringify(parsed, null, 2));
@@ -128,7 +128,7 @@ wss.on('connection', (clientWs) => {
                 } else if (msgType === 'session.updated') {
                   console.log('✅ OpenAI session.updated event received');
                 }
-                
+
                 if (clientWs.readyState === WebSocket.OPEN) {
                   console.log('   ✅ Client WebSocket is OPEN, forwarding', msgType);
                   clientWs.send(data);
@@ -154,7 +154,7 @@ wss.on('connection', (clientWs) => {
         console.error('⚠️ Unexpected disconnect! Code:', code, 'Reason:', reason);
       }
       isConnected = false;
-      
+
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(JSON.stringify({
           type: 'connection_status',
@@ -172,19 +172,19 @@ wss.on('connection', (clientWs) => {
         console.log('⚠️ Skipping empty client message');
         return;
       }
-      
+
       const messageStr = data.toString();
       console.log('📥 Received from client:', messageStr.substring(0, 100));
-      
+
       const message = JSON.parse(messageStr);
-      
+
       // If it's a connection request, connect to OpenAI
       if (message.type === 'connect') {
         console.log('🔄 Client requested connection to OpenAI');
         connectToOpenAI();
         return;
       }
-      
+
       // Forward all other messages to OpenAI
       if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
         console.log('📤 Forwarding to OpenAI:', message.type || 'unknown');
@@ -217,17 +217,17 @@ wss.on('connection', (clientWs) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     connections: wss.clients.size
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Proxy server running on port ${PORT}`);
-  console.log(`📡 WebSocket endpoint: ws://192.168.4.29:${PORT}/realtime`);
+  console.log(`📡 WebSocket endpoint: /realtime`);
   console.log(`🌐 Listening on all interfaces (0.0.0.0:${PORT})`);
   console.log(`🔑 Using OpenAI API Key: ${OPENAI_API_KEY.substring(0, 10)}...`);
 });
