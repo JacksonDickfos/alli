@@ -848,16 +848,7 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
               >
                 {messages.length === 0 ? (
                   <View style={styles.centerHeroContainer}>
-                    <View style={styles.pulseRing}>
-                      <View style={styles.pulseInner}>
-                        <Image
-                          source={require("../assets/logo.png")}
-                          style={styles.heroImage}
-                        />
-                      </View>
-                    </View>
                     <Text style={styles.statusText}>{getStateText()}</Text>
-                    {renderQuickSuggestions()}
                   </View>
                 ) : (
                   messages.map((message, index) => renderMessage(message, index === messages.length - 1))
