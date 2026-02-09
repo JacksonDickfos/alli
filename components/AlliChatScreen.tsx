@@ -5,6 +5,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,11 +17,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Markdown from 'react-native-markdown-display';
 import * as Clipboard from 'expo-clipboard';
+import Constants from 'expo-constants';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../lib/supabase';
+
+const ALLI_AVATAR = require('../assets/Chick2.png');
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -41,7 +47,18 @@ type Conversation = {
 const TABLE_CONVERSATIONS = 'alli_ai_conversations';
 const TABLE_MESSAGES = 'alli_ai_messages';
 
-const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined) || 'http://localhost:3001';
+function normalizeBaseUrl(url: string) {
+  return url.trim().replace(/\/+$/, '');
+}
+
+// IMPORTANT:
+// - In TestFlight/production there is no "localhost", so we MUST use a real HTTPS backend.
+// - Prefer EXPO_PUBLIC_BACKEND_URL for dev/web, then app.json extra.backendUrl for native builds.
+const BACKEND_URL = normalizeBaseUrl(
+  (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined) ||
+    (Constants.expoConfig?.extra?.backendUrl as string | undefined) ||
+    (__DEV__ ? 'http://localhost:3001' : 'https://alli-backend.vercel.app')
+);
 const BACKEND_API_KEY = process.env.EXPO_PUBLIC_BACKEND_API_KEY as string | undefined;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -289,7 +306,7 @@ function TypingIndicator() {
     <View style={styles.assistantMessageContainer}>
       <View style={styles.avatarRow}>
         <LinearGradient colors={['#B9A68D', '#8B7355']} style={styles.avatar}>
-          <Text style={styles.avatarText}>A</Text>
+          <Image source={ALLI_AVATAR} style={styles.avatarImage} />
         </LinearGradient>
         <Text style={styles.assistantLabel}>Alli</Text>
       </View>
@@ -331,6 +348,8 @@ function CopyButton({ content }: { content: string }) {
 }
 
 export default function AlliChatScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
@@ -624,7 +643,7 @@ export default function AlliChatScreen() {
       <View style={styles.assistantMessageContainer}>
         <View style={styles.avatarRow}>
           <LinearGradient colors={['#B9A68D', '#8B7355']} style={styles.avatar}>
-            <Text style={styles.avatarText}>A</Text>
+            <Image source={ALLI_AVATAR} style={styles.avatarImage} />
           </LinearGradient>
           <Text style={styles.assistantLabel}>Alli</Text>
         </View>
@@ -641,7 +660,7 @@ export default function AlliChatScreen() {
   const renderEmptyChat = () => (
     <View style={styles.emptyContainer}>
       <LinearGradient colors={['#B9A68D', '#8B7355']} style={styles.emptyLogo}>
-        <Text style={styles.emptyLogoText}>A</Text>
+        <Image source={ALLI_AVATAR} style={styles.emptyLogoImage} />
       </LinearGradient>
       <Text style={styles.emptyTitle}>Hi, I'm Alli!</Text>
       <Text style={styles.emptySubtitle}>Your personal nutrition assistant</Text>
@@ -762,10 +781,16 @@ export default function AlliChatScreen() {
         <KeyboardAvoidingView
           style={styles.body}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          // Keep composer visible above keyboard (tab bar is no longer overlaying screens).
+          keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight : 0}
         >
           {visibleMessages.length === 0 ? (
-            <ScrollView contentContainerStyle={styles.emptyScrollContainer}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.emptyScrollContainer,
+                { paddingBottom: 80 },
+              ]}
+            >
               {renderEmptyChat()}
             </ScrollView>
           ) : (
@@ -774,7 +799,11 @@ export default function AlliChatScreen() {
               data={visibleMessages}
               keyExtractor={(m) => m.id}
               renderItem={renderMessage}
-              contentContainerStyle={styles.messagesList}
+              contentContainerStyle={[
+                styles.messagesList,
+                // Extra bottom padding so last message isn't hidden behind composer.
+                { paddingBottom: 20 + 120 },
+              ]}
               onContentSizeChange={scrollToEnd}
               onLayout={scrollToEnd}
               showsVerticalScrollIndicator={false}
@@ -782,7 +811,13 @@ export default function AlliChatScreen() {
           )}
 
           {/* Composer */}
-          <View style={styles.composerContainer}>
+          <View
+            style={[
+              styles.composerContainer,
+              // Keep a small safe-area cushion so it doesn't touch the home indicator.
+              { paddingBottom: (Platform.OS === 'ios' ? 8 : 16) + Math.max(insets.bottom, 0) },
+            ]}
+          >
             <View style={styles.composer}>
               <TextInput
                 value={input}
@@ -936,8 +971,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
+    overflow: 'hidden',
   },
   emptyLogoText: { fontSize: 36, fontWeight: '700', color: '#fff' },
+  emptyLogoImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'cover',
+  },
   emptyTitle: { fontSize: 28, fontWeight: '700', color: '#111827', marginBottom: 8 },
   emptySubtitle: { fontSize: 16, color: '#6B7280', marginBottom: 12 },
   emptyDescription: { fontSize: 15, color: '#9CA3AF', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
@@ -992,8 +1033,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   avatarText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'cover',
+  },
   assistantLabel: {
     marginLeft: 10,
     fontSize: 15,
