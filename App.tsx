@@ -14,6 +14,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import { AppProvider } from './contexts/AppContext';
 import AlliChatScreen from './components/AlliChatScreen';
+import AlliScreen from './screens/AlliScreen';
 import HomeScreen from './screens/HomeScreen';
 import NutritionScreen from './screens/NutritionScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -580,12 +581,14 @@ function LoggedInRoot({
   onShowLoggingMenu,
   onCloseLoggingMenu,
   currentRoute,
+  navigationRef,
 }: {
   onLogout: () => void;
   showLoggingMenu: boolean;
   onShowLoggingMenu: () => void;
   onCloseLoggingMenu: () => void;
   currentRoute: string | null;
+  navigationRef: React.RefObject<NavigationContainerRef<any>>;
 }) {
   const { state, clearUser } = useApp();
   const needsOnboarding = state.user && state.user.onboardingCompleted === false;
@@ -610,7 +613,7 @@ function LoggedInRoot({
     <>
       <MainTabNavigator onLogout={handleLogout} />
       <FloatingLogButton onPress={onShowLoggingMenu} currentRoute={currentRoute} />
-      <LoggingMenuModal visible={showLoggingMenu} onClose={onCloseLoggingMenu} />
+      <LoggingMenuModal visible={showLoggingMenu} onClose={onCloseLoggingMenu} navigationRef={navigationRef} />
     </>
   );
 }
@@ -687,7 +690,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
       />
       <Tab.Screen
         name="Alli"
-        component={AlliChatScreen}
+        component={AlliScreen}
         options={{
           tabBarLabel: 'Alli',
           tabBarButton: (props) => <AlliTabBarButton {...props} />, 
@@ -1099,6 +1102,7 @@ export default function App() {
                       onShowLoggingMenu={() => setShowLoggingMenu(true)}
                       onCloseLoggingMenu={() => setShowLoggingMenu(false)}
                       currentRoute={currentRoute}
+                      navigationRef={navigationRef}
                     />
                   )}
                 </RootStack.Screen>
