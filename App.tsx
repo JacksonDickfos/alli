@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NavigationContainer, useNavigationState, NavigationContainerRef } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, useNavigationState, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
@@ -804,7 +804,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Something went wrong</Text>
           <Text style={{ color: '#333', textAlign: 'center' }}>{this.state.errorMsg}</Text>
         </SafeAreaView>
@@ -839,7 +839,7 @@ function FloatingLogButton({ onPress, currentRoute }: { onPress: () => void; cur
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [bootTimedOut, setBootTimedOut] = useState(false);
   const [showLoggingMenu, setShowLoggingMenu] = useState(false);
@@ -959,25 +959,27 @@ export default function App() {
       console.log('Auth state changed:', event, !!session);
       
       if (event === 'SIGNED_IN' && session) {
-        // User signed in - save permanently
         await AsyncStorage.setItem('isLoggedIn', 'true');
         await AsyncStorage.setItem('token', session.access_token);
         setIsLoggedIn(true);
         console.log('✅ User signed in - saved permanently');
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Token refreshed - keep logged in AND update token
         await AsyncStorage.setItem('isLoggedIn', 'true');
         await AsyncStorage.setItem('token', session.access_token);
         setIsLoggedIn(true);
         console.log('✅ Token refreshed - user stays logged in');
+      } else if (event === 'INITIAL_SESSION' && session) {
+        // Already have a session (e.g. app restarted) - go to main app, don't show white/login
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('token', session.access_token);
+        setIsLoggedIn(true);
+        console.log('✅ Initial session - user already logged in');
       } else if (event === 'SIGNED_OUT') {
-        // Only handle explicit sign out
         console.log('User explicitly signed out');
         await AsyncStorage.removeItem('isLoggedIn');
         await AsyncStorage.removeItem('token');
         setIsLoggedIn(false);
       }
-      // NOTE: We ignore other events to keep user logged in
     });
 
     // Web-only: poll for new deploys and show update banner
@@ -1026,14 +1028,14 @@ export default function App() {
 
   if (loading && !bootTimedOut) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#0090A3' }}>Loading…</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#0090A3', fontSize: 18 }}>Loading…</Text>
       </SafeAreaView>
     );
   }
   if (loading && bootTimedOut) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Still loading…</Text>
         <Text style={{ color: '#333', textAlign: 'center' }}>If this persists, please reload the app.</Text>
       </SafeAreaView>
@@ -1042,7 +1044,7 @@ export default function App() {
 
   if (!isSupabaseConfigured || !supabase) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Setup required</Text>
         <Text style={{ color: '#333', textAlign: 'center' }}>
           Supabase isn’t configured for this build, so the app can’t start.
@@ -1051,11 +1053,27 @@ export default function App() {
     );
   }
 
+  const navTheme = {
+    ...DefaultTheme,
+    dark: false,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: '#0090A3',
+      background: '#CDC4B7',
+      card: '#CDC4B7',
+      text: '#2A2A2A',
+      border: '#E0E0E0',
+      notification: '#6E006A',
+    },
+  };
+
   return (
-    <AppProvider>
-      <ErrorBoundary>
-        <NavigationContainer
-          ref={navigationRef}
+    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+      <AppProvider>
+        <ErrorBoundary>
+          <NavigationContainer
+            ref={navigationRef}
+            theme={navTheme}
           onReady={() => {
             // Get initial route
             const state = navigationRef.current?.getState();
@@ -1079,7 +1097,7 @@ export default function App() {
             }
           }}
         >
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
             {updateAvailable && Platform.OS === 'web' && (
               <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
                 <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
@@ -1088,22 +1106,28 @@ export default function App() {
                 </TouchableOpacity>
               </View>
             )}
-            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#CDC4B7' } }}>
               {!isLoggedIn ? (
                 <RootStack.Screen name="Auth">
-                  {() => <AuthStack onAuth={handleAuth} />}
+                  {() => (
+                    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+                      <AuthStack onAuth={handleAuth} />
+                    </View>
+                  )}
                 </RootStack.Screen>
               ) : (
                 <RootStack.Screen name="MainApp">
                   {() => (
-                    <LoggedInRoot
-                      onLogout={handleLogout}
-                      showLoggingMenu={showLoggingMenu}
-                      onShowLoggingMenu={() => setShowLoggingMenu(true)}
-                      onCloseLoggingMenu={() => setShowLoggingMenu(false)}
-                      currentRoute={currentRoute}
-                      navigationRef={navigationRef}
-                    />
+                    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+                      <LoggedInRoot
+                        onLogout={handleLogout}
+                        showLoggingMenu={showLoggingMenu}
+                        onShowLoggingMenu={() => setShowLoggingMenu(true)}
+                        onCloseLoggingMenu={() => setShowLoggingMenu(false)}
+                        currentRoute={currentRoute}
+                        navigationRef={navigationRef}
+                      />
+                    </View>
                   )}
                 </RootStack.Screen>
               )}
@@ -1112,6 +1136,7 @@ export default function App() {
         </NavigationContainer>
       </ErrorBoundary>
     </AppProvider>
+    </View>
   );
 }
 

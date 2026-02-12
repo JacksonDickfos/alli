@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#CDC4B7"
     },
     "ios": {
       "bundleIdentifier": "io.alli.app",
@@ -27,7 +27,7 @@
       "package": "io.alli.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/Chick2copy.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#CDC4B7"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [

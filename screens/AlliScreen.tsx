@@ -145,7 +145,6 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
   // Refs
   const scrollViewRef = useRef<ScrollView>(null);
-  const pulse = useRef(new Animated.Value(0)).current;
   const audioLevelSmoothRef = useRef(0);
   const lastSpeakingTime = useRef(Date.now());
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -154,25 +153,15 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
   const todaysTotals = getTodaysTotals();
   const goals = state.nutritionGoals;
 
-  // Pulse animation
+  // Fade-in only (no pulse)
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-
-    return () => loop.stop();
-  }, [pulse]);
+  }, []);
 
   // Auto-scroll messages
   useEffect(() => {
@@ -764,45 +753,22 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        {/* Error Banner */}
-        {connectionError && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>⚠️ {connectionError}</Text>
-            <TouchableOpacity onPress={() => setConnectionError(null)}>
-              <Text style={styles.dismissText}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* Centered pulsating Alli avatar */}
+          {/* Centered Alli avatar (no pulse) */}
           <View style={styles.centerHeroContainer}>
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    scale: pulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.08 + audioLevel * 0.2]
-                    }),
-                  },
-                ],
-              }}
+            <LinearGradient
+              colors={[getOrbColor(), '#6E006A', '#4F0232']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pulseRing}
             >
-              <LinearGradient
-                colors={[getOrbColor(), '#6E006A', '#4F0232']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.pulseRing}
-              >
-                <View style={styles.pulseInner}>
-                  <Image source={require('../assets/Chick2.png')} style={styles.heroImage} />
-                </View>
-              </LinearGradient>
-            </Animated.View>
+              <View style={styles.pulseInner}>
+                <Image source={require('../assets/Chick2.png')} style={styles.heroImage} />
+              </View>
+            </LinearGradient>
 
             {/* Voice control buttons */}
             <View style={styles.voiceButtonsContainer}>
@@ -936,28 +902,6 @@ const styles = StyleSheet.create({
   },
   keyboardAvoidingView: {
     flex: 1,
-  },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FCA5A5',
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#991B1B',
-    fontWeight: '500',
-  },
-  dismissText: {
-    fontSize: 13,
-    color: '#DC2626',
-    fontWeight: '600',
-    marginLeft: 12,
   },
   centerHeroContainer: {
     alignItems: 'center',
