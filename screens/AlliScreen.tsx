@@ -236,8 +236,8 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
     setMessages(prev => [...prev, optimisticUser, optimisticAI]);
 
     try {
-      const systemPrompt = 
-`You are Alli, a friendly and supportive nutrition assistant. Your goal is to help people eat better and feel healthier.
+      const systemPrompt =
+        `You are Alli, a friendly and supportive nutrition assistant. Your goal is to help people eat better and feel healthier.
 
 IMPORTANT RULES FOR HOW YOU RESPOND:
 
@@ -274,7 +274,7 @@ IMPORTANT RULES FOR HOW YOU RESPOND:
 
 Remember: Your user might be confused, overwhelmed, or just starting their health journey. Make nutrition feel approachable and doable, not complicated or scary.`;
 
-      
+
       // Filter out pending messages when sending to API
       const messagesToSend = [
         { role: 'system' as const, content: systemPrompt },
@@ -285,8 +285,11 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
       let assistantText = '';
       let novitaError = '';
 
-      // 1. Try Novita API
+      // 1. Try Novita API with 10s timeout
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
         const res = await fetch(NOVITA_API_URL as string, {
           method: 'POST',
           headers: {
@@ -301,7 +304,10 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
             max_tokens: 800,
             reasoning: { enabled: false }
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           const json = await res.json();

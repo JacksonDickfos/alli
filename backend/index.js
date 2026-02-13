@@ -319,7 +319,7 @@ app.post('/passio/recognize-image', async (req, res) => {
 app.post('/chat', async (req, res) => {
   try {
     console.log('📨 Received /chat request');
-    
+
     if (BACKEND_API_KEY) {
       const clientKey = req.header('x-api-key');
       if (!clientKey || clientKey !== BACKEND_API_KEY) {
@@ -372,9 +372,9 @@ app.post('/chat', async (req, res) => {
       // but dedicated endpoint model IDs DO include the endpoint suffix and must not be stripped.
       const modelCandidates =
         providerName === 'novita' &&
-        !usingNovitaDedicatedEndpoint &&
-        typeof configuredModel === 'string' &&
-        configuredModel.includes(':')
+          !usingNovitaDedicatedEndpoint &&
+          typeof configuredModel === 'string' &&
+          configuredModel.includes(':')
           ? [configuredModel, configuredModel.split(':')[0]]
           : [configuredModel];
 
@@ -432,12 +432,12 @@ app.post('/chat', async (req, res) => {
       return { upstreamRes, data, usedModel };
     };
 
-    // Primary call (Novita preferred if configured)
-    let { upstreamRes, data, usedModel } = await callProvider(provider, 25_000);
+    // Primary call (10s timeout)
+    let { upstreamRes, data, usedModel } = await callProvider(provider, 10_000);
 
     console.log('📥 Received response from upstream');
     console.log('📊 Status:', upstreamRes.status, upstreamRes.statusText);
-    
+
     if (!upstreamRes.ok) {
       console.log('❌ Upstream LLM error:', data);
       return res.status(upstreamRes.status).json({
@@ -452,7 +452,7 @@ app.post('/chat', async (req, res) => {
     if (!content) {
       console.warn('⚠️ Upstream returned empty content; retrying once.');
       try {
-        ({ upstreamRes, data, usedModel } = await callProvider(provider, 15_000));
+        ({ upstreamRes, data, usedModel } = await callProvider(provider, 5_000));
         if (upstreamRes.ok) content = extractAssistantContent(data);
       } catch (e) {
         console.warn('⚠️ Retry failed:', e instanceof Error ? e.message : String(e));
@@ -463,7 +463,7 @@ app.post('/chat', async (req, res) => {
     if (!content && provider === 'novita' && OPENAI_API_KEY) {
       console.warn('⚠️ Novita returned empty content; falling back to OpenAI.');
       try {
-        const openaiResult = await callProvider('openai', 25_000);
+        const openaiResult = await callProvider('openai', 10_000);
         if (openaiResult.upstreamRes.ok) {
           content = extractAssistantContent(openaiResult.data);
         } else {
@@ -482,7 +482,7 @@ app.post('/chat', async (req, res) => {
 
     console.log('✅ Response received successfully');
     console.log('📝 Content length:', content.length);
-    
+
     return res.json({
       message: { role: 'assistant', content },
       usage: data?.usage,

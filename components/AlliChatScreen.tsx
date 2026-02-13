@@ -56,8 +56,8 @@ function normalizeBaseUrl(url: string) {
 // - Prefer EXPO_PUBLIC_BACKEND_URL for dev/web, then app.json extra.backendUrl for native builds.
 const BACKEND_URL = normalizeBaseUrl(
   (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined) ||
-    (Constants.expoConfig?.extra?.backendUrl as string | undefined) ||
-    (__DEV__ ? 'http://localhost:3001' : 'https://alli-backend.vercel.app')
+  (Constants.expoConfig?.extra?.backendUrl as string | undefined) ||
+  (__DEV__ ? 'http://localhost:3001' : 'https://alli-backend.vercel.app')
 );
 const BACKEND_API_KEY = process.env.EXPO_PUBLIC_BACKEND_API_KEY as string | undefined;
 
@@ -335,10 +335,10 @@ function CopyButton({ content }: { content: string }) {
 
   return (
     <TouchableOpacity onPress={handleCopy} style={styles.copyButton}>
-      <Ionicons 
-        name={copied ? 'checkmark-circle' : 'copy-outline'} 
-        size={18} 
-        color={copied ? '#10B981' : '#9CA3AF'} 
+      <Ionicons
+        name={copied ? 'checkmark-circle' : 'copy-outline'}
+        size={18}
+        color={copied ? '#10B981' : '#9CA3AF'}
       />
       <Text style={[styles.copyButtonText, copied && styles.copyButtonTextCopied]}>
         {copied ? 'Copied!' : 'Copy'}
@@ -576,6 +576,9 @@ export default function AlliChatScreen() {
         .filter(m => m.content && m.content !== '…')
         .map(m => ({ role: m.role, content: m.content }));
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: {
@@ -584,7 +587,10 @@ export default function AlliChatScreen() {
           ...(BACKEND_API_KEY ? { 'x-api-key': BACKEND_API_KEY } : {}),
         },
         body: JSON.stringify({ messages: historyPayload }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -998,7 +1004,7 @@ const styles = StyleSheet.create({
 
   // Messages
   messagesList: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20 },
-  
+
   // User message - right aligned bubble
   userMessageContainer: {
     alignItems: 'flex-end',
