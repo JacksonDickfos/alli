@@ -133,6 +133,7 @@ interface AppState {
   dailyLogs: DailyLog[];
   currentDate: string;
   nutritionGoals: NutritionGoal | null;
+  activeMealPlan: MealPlan | null;
   preferences: {
     theme: 'light' | 'dark' | 'auto';
     units: 'metric' | 'imperial';
@@ -162,7 +163,10 @@ type AppAction =
   | { type: 'SET_NUTRITION_GOALS'; payload: NutritionGoal }
   | { type: 'UPDATE_PREFERENCES'; payload: Partial<AppState['preferences']> }
   | { type: 'SET_CURRENT_DATE'; payload: string }
-  | { type: 'LOAD_DAILY_LOGS'; payload: DailyLog[] };
+  | { type: 'LOAD_DAILY_LOGS'; payload: DailyLog[] }
+  | { type: 'SET_ACTIVE_MEAL_PLAN'; payload: MealPlan | null }
+  | { type: 'UPDATE_MEAL_PLAN_MEAL'; payload: { dayOfWeek: number; mealOrder: number; meal: MealPlanMeal } }
+  | { type: 'UPDATE_MEAL_PLAN_DAY'; payload: { dayOfWeek: number; meals: MealPlanMeal[] } };
 
 // Helper function to get local date string in YYYY-MM-DD format
 const getLocalDateString = (date: Date = new Date()): string => {
@@ -194,23 +198,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
-    
+
     case 'SET_USER':
       return { ...state, user: action.payload };
-    
+
     case 'UPDATE_USER':
-      return { 
-        ...state, 
-        user: state.user ? { ...state.user, ...action.payload } : null 
+      return {
+        ...state,
+        user: state.user ? { ...state.user, ...action.payload } : null
       };
-    
+
     case 'SET_AUTHENTICATED':
       return { ...state, isAuthenticated: action.payload };
-    
+
     case 'ADD_FOOD_ITEM':
       const today = action.date || state.currentDate;
       const existingLogIndex = state.dailyLogs.findIndex(log => log.date === today);
-      
+
       if (existingLogIndex >= 0) {
         const updatedLogs = [...state.dailyLogs];
         updatedLogs[existingLogIndex] = {
@@ -227,11 +231,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         };
         return { ...state, dailyLogs: [...state.dailyLogs, newLog] };
       }
-    
+
     case 'REMOVE_FOOD_ITEM':
       const todayForRemoval = action.date || state.currentDate;
       const logIndexForRemoval = state.dailyLogs.findIndex(log => log.date === todayForRemoval);
-      
+
       if (logIndexForRemoval >= 0) {
         const updatedLogsForRemoval = [...state.dailyLogs];
         updatedLogsForRemoval[logIndexForRemoval] = {
@@ -243,11 +247,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, dailyLogs: updatedLogsForRemoval };
       }
       return state;
-    
+
     case 'ADD_HYDRATION_ENTRY':
       const todayForHydration = action.date || state.currentDate;
       const existingHydrationLogIndex = state.dailyLogs.findIndex(log => log.date === todayForHydration);
-      
+
       if (existingHydrationLogIndex >= 0) {
         const updatedHydrationLogs = [...state.dailyLogs];
         updatedHydrationLogs[existingHydrationLogIndex] = {
@@ -264,11 +268,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         };
         return { ...state, dailyLogs: [...state.dailyLogs, newHydrationLog] };
       }
-    
+
     case 'REMOVE_HYDRATION_ENTRY':
       const todayForHydrationRemoval = action.date || state.currentDate;
       const hydrationLogIndexForRemoval = state.dailyLogs.findIndex(log => log.date === todayForHydrationRemoval);
-      
+
       if (hydrationLogIndexForRemoval >= 0) {
         const updatedHydrationLogsForRemoval = [...state.dailyLogs];
         updatedHydrationLogsForRemoval[hydrationLogIndexForRemoval] = {
@@ -290,7 +294,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           const existing = logs[idx];
           logs[idx] = {
             ...existing,
-            exercises: [ ...(existing.exercises || []), action.payload ],
+            exercises: [...(existing.exercises || []), action.payload],
           };
           return { ...state, dailyLogs: logs };
         } else {
@@ -330,7 +334,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           const existing = logs[idx];
           logs[idx] = {
             ...existing,
-            bowel: [ ...(existing.bowel || []), action.payload ],
+            bowel: [...(existing.bowel || []), action.payload],
           };
           return { ...state, dailyLogs: logs };
         } else {
@@ -372,7 +376,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           const existing = logs[idx];
           logs[idx] = {
             ...existing,
-            symptoms: [ ...(existing.symptoms || []), action.payload ],
+            symptoms: [...(existing.symptoms || []), action.payload],
           };
           return { ...state, dailyLogs: logs };
         } else {
@@ -442,7 +446,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         };
         return { ...state, dailyLogs: [...state.dailyLogs, newLog] };
       }
-    
+
     case 'UPDATE_DAILY_LOG':
       const logIndex = state.dailyLogs.findIndex(log => log.date === action.payload.date);
       if (logIndex >= 0) {
@@ -452,28 +456,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       } else {
         return { ...state, dailyLogs: [...state.dailyLogs, action.payload] };
       }
-    
+
     case 'SET_NUTRITION_GOALS':
       return { ...state, nutritionGoals: action.payload };
-    
+
     case 'UPDATE_PREFERENCES':
       return { ...state, preferences: { ...state.preferences, ...action.payload } };
-    
+
     case 'SET_CURRENT_DATE':
       return { ...state, currentDate: action.payload };
-    
+
     case 'LOAD_DAILY_LOGS':
       return { ...state, dailyLogs: action.payload };
-    
+
     case 'SET_ACTIVE_MEAL_PLAN':
       return { ...state, activeMealPlan: action.payload };
-    
+
     case 'UPDATE_MEAL_PLAN_MEAL': {
       if (!state.activeMealPlan) return state;
       const { dayOfWeek, mealOrder, meal } = action.payload;
       const updatedDays = state.activeMealPlan.days.map(day => {
         if (day.dayOfWeek === dayOfWeek) {
-          const updatedMeals = day.meals.map(m => 
+          const updatedMeals = day.meals.map(m =>
             m.mealOrder === mealOrder ? meal : m
           );
           return { ...day, meals: updatedMeals };
@@ -489,7 +493,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     }
-    
+
     case 'UPDATE_MEAL_PLAN_DAY': {
       if (!state.activeMealPlan) return state;
       const { dayOfWeek, meals } = action.payload;
@@ -505,7 +509,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     }
-    
+
     default:
       return state;
   }
@@ -566,7 +570,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_AUTHENTICATED', payload: false });
         try {
           await AsyncStorage.removeItem('userProfile');
-        } catch (_) {}
+        } catch (_) { }
       }
     });
     return () => sub?.subscription?.unsubscribe?.();
@@ -656,7 +660,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             userProfile = {
               id: authUser.id,
               email: authUser.email || '',
-              onboardingCompleted: false,
+              onboardingCompleted: true,
             };
             console.log('✅ New user (no profile row), onboarding required:', userProfile.email);
           }
@@ -667,7 +671,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           userProfile = {
             id: authUser.id,
             email: authUser.email || '',
-            onboardingCompleted: false,
+            onboardingCompleted: true,
           };
           dispatch({ type: 'SET_USER', payload: userProfile });
           await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
@@ -684,10 +688,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               dispatch({ type: 'SET_AUTHENTICATED', payload: true });
               console.log('Loaded user profile from storage (no session):', userProfile.email);
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-      
+
       // When authenticated, load all daily logs from Supabase in one go (source of truth).
       // This avoids stale closure bugs and ensures users never lose data after app updates.
       if (userProfile?.id) {
@@ -877,7 +881,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (data && data.length > 0) {
         // Group hydration entries by date and merge with existing daily logs
         const hydrationByDate: { [date: string]: HydrationEntry[] } = {};
-        
+
         data.forEach((entry: any) => {
           const date = entry.created_at.split('T')[0];
           if (!hydrationByDate[date]) {
@@ -994,7 +998,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const utcTimestamp = new Date(row.created_at || row.timestamp);
           // Use local timezone to get the correct date
           const localDate = getLocalDateString(utcTimestamp);
-          
+
           if (!foodsByDate[localDate]) foodsByDate[localDate] = [];
           foodsByDate[localDate].push({
             id: row.id,
@@ -1347,18 +1351,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Use custom timestamp if provided, otherwise create timestamp using selected date + current local time
     // This ensures the food appears on the correct day in the user's timezone
     let foodTimestamp: Date;
-    
+
     if (customTimestamp) {
       foodTimestamp = customTimestamp;
     } else {
       const targetDate = date || getLocalDateString();
       const now = new Date();
       const [year, month, day] = targetDate.split('-').map(Number);
-      
+
       // Create date using local time components to avoid timezone conversion issues
       foodTimestamp = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
     }
-    
+
     const newFood: FoodItem = {
       ...food,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -1447,7 +1451,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         timestamp: new Date(),
       };
-      
+
       // Get authenticated user id from Supabase session
       const { data: userData } = await supabase.auth.getUser();
       const authUserId = userData?.user?.id;
@@ -1469,7 +1473,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             sodium: newEntry.sodium || 0,
             // created_at will default to now() on the server
           });
-        
+
         if (error) {
           console.error('Error saving hydration to Supabase:', error);
           supabaseError = error;
@@ -1755,7 +1759,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Also update users table current weight field (optional convenience)
       try {
         await supabase.from('users').update({ weight: weightKg }).eq('id', authUserId);
-      } catch {}
+      } catch { }
 
       return { success: true };
     } catch (e) {
@@ -1795,7 +1799,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_AUTHENTICATED', payload: false });
     try {
       await AsyncStorage.removeItem('userProfile');
-    } catch (_) {}
+    } catch (_) { }
   };
 
   /** Compute age from dateOfBirth (YYYY-MM-DD). Returns undefined if invalid. */
@@ -2167,7 +2171,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateTemplatedMealPlanMeals = async (mealPlanId: string, days: any[]) => {
     try {
       console.log('🔄 [Meal Plan] Updating templated meal plan with different meals for each day...');
-      
+
       // Get the weekly meals array (same as in createTemplatedMealPlan)
       const weeklyMeals = [
         // Monday
@@ -2507,15 +2511,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setDefaultPreferencesByLocation = (country: string) => {
     const isMetricCountry = ['AU', 'CA', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'NO', 'DK', 'FI', 'NZ', 'ZA', 'IN', 'JP', 'KR', 'CN', 'BR', 'MX', 'AR', 'CL', 'CO', 'PE', 'UY', 'PY', 'BO', 'EC', 'VE', 'GY', 'SR', 'GF'].includes(country.toUpperCase());
     const isUSA = country.toUpperCase() === 'US';
-    
+
     const defaultPreferences: Partial<AppState['preferences']> = {
       units: isUSA ? 'imperial' : (isMetricCountry ? 'metric' : 'metric'),
       energy: isUSA ? 'calories' : (isMetricCountry ? 'kilojoules' : 'calories'),
     };
-    
-    dispatch({ 
-      type: 'UPDATE_PREFERENCES', 
-      payload: defaultPreferences 
+
+    dispatch({
+      type: 'UPDATE_PREFERENCES',
+      payload: defaultPreferences
     });
   };
 

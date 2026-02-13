@@ -96,11 +96,11 @@ function SignUpScreen({ navigation, onAuth }: any) {
       // Clear any existing session so the new account becomes the active one (no old email sticking)
       await supabase.auth.signOut();
       await new Promise((r) => setTimeout(r, 150));
-      const { data, error } = await supabase.auth.signUp({ 
-        email: trimmedEmail, 
-        password: trimmedPassword 
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword
       });
-      
+
       if (error) {
         console.error('Signup error:', error);
         setNotice({ text: error.message, type: 'error' });
@@ -155,9 +155,9 @@ function SignUpScreen({ navigation, onAuth }: any) {
         value={password}
         onChangeText={setPassword}
       />
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.buttonDisabled]} 
-        onPress={handleSignUp} 
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSignUp}
         disabled={loading}
       >
         <Text style={styles.buttonText}>
@@ -179,7 +179,7 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [savedCredentials, setSavedCredentials] = useState<{email: string, password: string} | null>(null);
+  const [savedCredentials, setSavedCredentials] = useState<{ email: string, password: string } | null>(null);
   const [isDevMode, setIsDevMode] = useState(__DEV__);
 
   const devLoginEmail = (process.env.EXPO_PUBLIC_DEV_LOGIN_EMAIL || '').trim();
@@ -212,17 +212,17 @@ function LoginScreen({ navigation, onAuth }: any) {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        
+
         console.log('Biometric check:', { hasHardware, isEnrolled, supportedTypes });
-        
+
         // Check specifically for Face ID (type 2) or Touch ID (type 1)
         const hasFaceID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
         const hasTouchID = supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
-        
+
         if (hasHardware && isEnrolled && (hasFaceID || hasTouchID)) {
           setBiometricAvailable(true);
           console.log('✅ Biometric authentication available:', hasFaceID ? 'Face ID' : 'Touch ID');
-          
+
           // Load saved credentials
           const savedEmail = await AsyncStorage.getItem('savedEmail');
           const savedPassword = await AsyncStorage.getItem('savedPassword');
@@ -244,7 +244,7 @@ function LoginScreen({ navigation, onAuth }: any) {
         console.log('❌ Biometric check error:', error);
       }
     };
-    
+
     checkBiometric();
   }, []);
 
@@ -262,11 +262,11 @@ function LoginScreen({ navigation, onAuth }: any) {
     setLoading(true);
     try {
       // Quick login without biometric - just use saved credentials
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: creds.email, 
-        password: creds.password 
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password
       });
-      
+
       if (error) {
         console.error('Quick login error:', error);
         setNotice({ text: error.message, type: 'error' });
@@ -311,11 +311,11 @@ function LoginScreen({ navigation, onAuth }: any) {
 
       if (result.success) {
         // Use saved credentials to log in
-        const { data, error } = await supabase.auth.signInWithPassword({ 
-          email: savedCredentials.email, 
-          password: savedCredentials.password 
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: savedCredentials.email,
+          password: savedCredentials.password
         });
-        
+
         if (error) {
           console.error('Face ID login error:', error);
           setNotice({ text: error.message, type: 'error' });
@@ -468,9 +468,9 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handlePerformReset} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handlePerformReset}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
@@ -497,20 +497,20 @@ function LoginScreen({ navigation, onAuth }: any) {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
               {loading ? 'Logging In...' : 'Log In'}
             </Text>
           </TouchableOpacity>
-          
+
           {biometricAvailable && savedCredentials && (
-            <TouchableOpacity 
-              style={[styles.faceIdButton, loading && styles.buttonDisabled]} 
-              onPress={handleFaceIDLogin} 
+            <TouchableOpacity
+              style={[styles.faceIdButton, loading && styles.buttonDisabled]}
+              onPress={handleFaceIDLogin}
               disabled={loading}
             >
               <Ionicons name="face-id" size={24} color="white" style={{ marginRight: 8 }} />
@@ -519,13 +519,13 @@ function LoginScreen({ navigation, onAuth }: any) {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           {/* Quick Login button - shows in dev mode (simulator) when credentials are saved */}
           {/* Shows even if Face ID is available, so you have both options in dev */}
           {allowQuickLogin && savedCredentials && (
-            <TouchableOpacity 
-              style={[styles.quickLoginButton, loading && styles.buttonDisabled]} 
-              onPress={handleQuickLogin} 
+            <TouchableOpacity
+              style={[styles.quickLoginButton, loading && styles.buttonDisabled]}
+              onPress={handleQuickLogin}
               disabled={loading}
             >
               <Ionicons name="flash" size={24} color="white" style={{ marginRight: 8 }} />
@@ -534,7 +534,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           {/* If the app was reinstalled (AsyncStorage cleared), keep Quick Login visible in dev using env creds. */}
           {allowQuickLogin && !savedCredentials && hasDevLoginCreds && (
             <TouchableOpacity
@@ -548,7 +548,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           <Text style={styles.link} onPress={handleForgotPassword}>Forgot password?</Text>
           <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>Don't have an account? Sign Up</Text>
         </>
@@ -606,9 +606,7 @@ function LoggedInRoot({
       </View>
     );
   }
-  if (needsOnboarding) {
-    return <OnboardingScreen />;
-  }
+
   return (
     <>
       <MainTabNavigator onLogout={handleLogout} />
@@ -652,7 +650,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         tabBarIcon: ({ color, size, focused }) => {
           const iconSize = size * 0.9; // Reduce by 10%
           const iconStyle = { marginTop: -5 }; // Move icons up 5px
-          
+
           if (route.name === 'Home') {
             return <MaterialCommunityIcons name="weather-sunset" size={iconSize} color={color} style={iconStyle} />;
           } else if (route.name === 'Nutrition') {
@@ -678,13 +676,13 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{ tabBarLabel: 'Today' }}
       />
-      <Tab.Screen 
-        name="Nutrition" 
+      <Tab.Screen
+        name="Nutrition"
         component={NutritionScreen}
         options={{ tabBarLabel: 'Diary' }}
       />
@@ -693,15 +691,15 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         component={AlliScreen}
         options={{
           tabBarLabel: 'Alli',
-          tabBarButton: (props) => <AlliTabBarButton {...props} />, 
+          tabBarButton: (props) => <AlliTabBarButton {...props} />,
         }}
       />
-      <Tab.Screen 
-        name="Plan" 
+      <Tab.Screen
+        name="Plan"
         component={MealPlanScreen}
         options={{ tabBarLabel: 'Plan' }}
       />
-      <Tab.Screen 
+      <Tab.Screen
         name="Menu"
         options={{ tabBarLabel: 'More' }}
       >
@@ -862,9 +860,9 @@ export default function App() {
           console.log('Token refresh error (non-critical):', error.message);
           // DON'T log out - keep user logged in even if token refresh fails
           // Only log out if it's a real authentication failure
-          if (error.message.includes('Invalid JWT') || 
-              error.message.includes('Token expired') ||
-              error.message.includes('Invalid token')) {
+          if (error.message.includes('Invalid JWT') ||
+            error.message.includes('Token expired') ||
+            error.message.includes('Invalid token')) {
             console.log('Real auth failure - but keeping user logged in for now');
             // Don't actually log out - let them try again
           }
@@ -900,7 +898,7 @@ export default function App() {
         // BULLETPROOF AUTH: Always stay logged in unless explicitly logged out
         const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
         const autoLogin = process.env.EXPO_PUBLIC_AUTO_LOGIN === 'true';
-        
+
         if (savedAuthState === 'true' && autoLogin) {
           // User was logged in AND auto-login enabled, keep them logged in FOREVER
           console.log('✅ User was logged in (auto-login enabled), keeping them logged in permanently');
@@ -921,7 +919,7 @@ export default function App() {
         // Only check session if auto-login is enabled and no saved state
         const { data } = await supabase.auth.getSession();
         if (!isMounted) return;
-        
+
         if (data.session) {
           // Found a session, save it permanently
           await AsyncStorage.setItem('isLoggedIn', 'true');
@@ -934,7 +932,7 @@ export default function App() {
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (!isMounted) return;
-        
+
         // On ANY error, check saved state and keep user logged in
         const savedAuthState = await AsyncStorage.getItem('isLoggedIn');
         if (savedAuthState === 'true') {
@@ -957,7 +955,7 @@ export default function App() {
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, !!session);
-      
+
       if (event === 'SIGNED_IN' && session) {
         await AsyncStorage.setItem('isLoggedIn', 'true');
         await AsyncStorage.setItem('token', session.access_token);
@@ -995,7 +993,7 @@ export default function App() {
             setUpdateAvailable(true);
           }
           localStorage.setItem(KEY, text);
-        } catch {}
+        } catch { }
       };
       check();
       interval = setInterval(check, 30000);
@@ -1012,7 +1010,7 @@ export default function App() {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('isLoggedIn');
     await AsyncStorage.removeItem('userProfile'); // so next login/signup isn’t confused with old account
-    try { if (supabase) await supabase.auth.signOut(); } catch {}
+    try { if (supabase) await supabase.auth.signOut(); } catch { }
     setIsLoggedIn(false);
   };
 
@@ -1074,68 +1072,68 @@ export default function App() {
           <NavigationContainer
             ref={navigationRef}
             theme={navTheme}
-          onReady={() => {
-            // Get initial route
-            const state = navigationRef.current?.getState();
-            if (state) {
-              const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
-              if (mainAppRoute?.state) {
-                const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
-                setCurrentRoute(activeTab?.name || null);
+            onReady={() => {
+              // Get initial route
+              const state = navigationRef.current?.getState();
+              if (state) {
+                const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
+                if (mainAppRoute?.state) {
+                  const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
+                  setCurrentRoute(activeTab?.name || null);
+                }
               }
-            }
-          }}
-          onStateChange={() => {
-            // Update route when navigation state changes
-            const state = navigationRef.current?.getState();
-            if (state) {
-              const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
-              if (mainAppRoute?.state) {
-                const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
-                setCurrentRoute(activeTab?.name || null);
+            }}
+            onStateChange={() => {
+              // Update route when navigation state changes
+              const state = navigationRef.current?.getState();
+              if (state) {
+                const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
+                if (mainAppRoute?.state) {
+                  const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
+                  setCurrentRoute(activeTab?.name || null);
+                }
               }
-            }
-          }}
-        >
-          <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-            {updateAvailable && Platform.OS === 'web' && (
-              <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
-                <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
-                <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#0090A3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#CDC4B7' } }}>
-              {!isLoggedIn ? (
-                <RootStack.Screen name="Auth">
-                  {() => (
-                    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-                      <AuthStack onAuth={handleAuth} />
-                    </View>
-                  )}
-                </RootStack.Screen>
-              ) : (
-                <RootStack.Screen name="MainApp">
-                  {() => (
-                    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-                      <LoggedInRoot
-                        onLogout={handleLogout}
-                        showLoggingMenu={showLoggingMenu}
-                        onShowLoggingMenu={() => setShowLoggingMenu(true)}
-                        onCloseLoggingMenu={() => setShowLoggingMenu(false)}
-                        currentRoute={currentRoute}
-                        navigationRef={navigationRef}
-                      />
-                    </View>
-                  )}
-                </RootStack.Screen>
+            }}
+          >
+            <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+              {updateAvailable && Platform.OS === 'web' && (
+                <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
+                  <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
+                  <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#0090A3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
+                  </TouchableOpacity>
+                </View>
               )}
-            </RootStack.Navigator>
-          </View>
-        </NavigationContainer>
-      </ErrorBoundary>
-    </AppProvider>
+              <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#CDC4B7' } }}>
+                {!isLoggedIn ? (
+                  <RootStack.Screen name="Auth">
+                    {() => (
+                      <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+                        <AuthStack onAuth={handleAuth} />
+                      </View>
+                    )}
+                  </RootStack.Screen>
+                ) : (
+                  <RootStack.Screen name="MainApp">
+                    {() => (
+                      <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+                        <LoggedInRoot
+                          onLogout={handleLogout}
+                          showLoggingMenu={showLoggingMenu}
+                          onShowLoggingMenu={() => setShowLoggingMenu(true)}
+                          onCloseLoggingMenu={() => setShowLoggingMenu(false)}
+                          currentRoute={currentRoute}
+                          navigationRef={navigationRef}
+                        />
+                      </View>
+                    )}
+                  </RootStack.Screen>
+                )}
+              </RootStack.Navigator>
+            </View>
+          </NavigationContainer>
+        </ErrorBoundary>
+      </AppProvider>
     </View>
   );
 }
