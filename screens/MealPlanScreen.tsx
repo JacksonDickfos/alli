@@ -9,7 +9,10 @@ import {
   Platform,
   RefreshControl,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,13 +37,60 @@ export default function MealPlanScreen() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [newMeal, setNewMeal] = useState({
+    title: '',
+    description: '',
+    mealType: 'breakfast' as any,
+  });
+  const [loggingPlan, setLoggingPlan] = useState(false);
+
 
   const refresh = async () => {
     setRefreshing(true);
+    await loadActiveMealPlan();
+    setRefreshing(false);
+  };
+
+  const handleManualAdd = async () => {
+    if (!newMeal.title || selectedDay === null) {
+      Alert.alert('Error', 'Please enter a meal title.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      await loadActiveMealPlan();
+      const result = await (state as any).addMealToPlanDay(selectedDay, {
+        title: newMeal.title,
+        description: newMeal.description,
+        mealType: newMeal.mealType,
+        mealOrder: 0, // Simplified
+        ingredients: [],
+      });
+      if (result.success) {
+        setShowMealModal(false);
+        setNewMeal({ title: '', description: '', mealType: 'breakfast' });
+      } else {
+        Alert.alert('Error', 'Failed to add meal.');
+      }
     } finally {
-      setRefreshing(false);
+      setLoading(false);
+    }
+  };
+
+  const handleLogPlanToDiary = async () => {
+    if (!activeMealPlan) return;
+    setLoggingPlan(true);
+    try {
+      const result = await (state as any).logMealPlanToDiary(activeMealPlan.days);
+      if (result.success) {
+        Alert.alert('Success', 'Today\'s meals from your plan have been added to your Diary!');
+      } else {
+        Alert.alert('Error', 'Failed to log plan to diary.');
+      }
+    } finally {
+      setLoggingPlan(false);
     }
   };
 
@@ -86,7 +136,31 @@ export default function MealPlanScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#0090A3" />
         }
       >
-        <Text style={styles.screenTitle}>Meal Plan</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.screenTitle}>Meal Plan</Text>
+          {hasPlan && (
+            <TouchableOpacity
+              style={styles.logPlanBtn}
+              onPress={handleLogPlanToDiary}
+              disabled={loggingPlan}
+            >
+              <LinearGradient
+                colors={['#0090A3', '#28657A']}
+                style={styles.logPlanGradient}
+              >
+                {loggingPlan ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="journal-outline" size={18} color="#fff" />
+                    <Text style={styles.logPlanText}>Log to Diary</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+
 
         {!hasPlan ? (
           <View style={styles.emptyBlock}>
@@ -125,7 +199,19 @@ export default function MealPlanScreen() {
               .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
               .map((day: MealPlanDay) => (
                 <View key={day.id} style={styles.dayCard}>
-                  <Text style={styles.dayTitle}>{DAY_NAMES[day.dayOfWeek] ?? `Day ${day.dayOfWeek + 1}`}</Text>
+                  <View style={styles.dayHeader}>
+                    <Text style={styles.dayTitle}>{DAY_NAMES[day.dayOfWeek] ?? `Day ${day.dayOfWeek + 1}`}</Text>
+                    <TouchableOpacity
+                      style={styles.addBtn}
+                      onPress={() => {
+                        setSelectedDay(day.dayOfWeek);
+                        setShowMealModal(true);
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={24} color="#0090A3" />
+                    </TouchableOpacity>
+                  </View>
+
                   {(day.meals || [])
                     .slice()
                     .sort((a, b) => a.mealOrder - b.mealOrder)
@@ -151,7 +237,55 @@ export default function MealPlanScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Manual Add Modal */}
+      <Modal visible={showMealModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Meal to {selectedDay !== null ? DAY_NAMES[selectedDay] : ''}</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Meal Title (e.g. Scrambled Eggs)"
+              value={newMeal.title}
+              onChangeText={(text) => setNewMeal({ ...newMeal, title: text })}
+            />
+
+            <TextInput
+              style={[styles.modalInput, styles.descriptionInput]}
+              placeholder="Description (optional)"
+              multiline
+              value={newMeal.description}
+              onChangeText={(text) => setNewMeal({ ...newMeal, description: text })}
+            />
+
+            <View style={styles.mealTypeRow}>
+              {(['breakfast', 'snack', 'lunch', 'dinner'] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.typeBtn, newMeal.mealType === type && styles.typeBtnActive]}
+                  onPress={() => setNewMeal({ ...newMeal, mealType: type })}
+                >
+                  <Text style={[styles.typeBtnText, newMeal.mealType === type && styles.typeBtnTextActive]}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowMealModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleManualAdd}>
+                <Text style={styles.saveBtnText}>Add Meal</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+
   );
 }
 
@@ -285,4 +419,121 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  logPlanBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  logPlanGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  logPlanText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addBtn: {
+    padding: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10 },
+      android: { elevation: 10 },
+    }),
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0090A3',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  descriptionInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  mealTypeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  typeBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  typeBtnActive: {
+    backgroundColor: '#0090A3',
+    borderColor: '#0090A3',
+  },
+  typeBtnText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  typeBtnTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 2,
+    backgroundColor: '#0090A3',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });
+

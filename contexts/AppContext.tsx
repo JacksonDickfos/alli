@@ -107,7 +107,12 @@ export interface MealPlanMeal {
   title: string;
   description?: string;
   ingredients: MealPlanIngredient[];
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
 }
+
 
 export interface MealPlanDay {
   id: string;
@@ -549,6 +554,9 @@ const AppContext = createContext<{
   updateMealPlanDay: (dayOfWeek: number, meals: MealPlanMeal[]) => Promise<{ success: boolean; error?: any }>;
   setActiveMealPlan: (mealPlan: MealPlan) => Promise<{ success: boolean; error?: any }>;
   createMealPlanFromChat: (days: MealPlanDay[]) => Promise<{ success: boolean; error?: any; mealPlanId?: string }>;
+  addMealToPlanDay: (dayOfWeek: number, meal: Omit<MealPlanMeal, 'id'>) => Promise<{ success: boolean; error?: any }>;
+  logMealPlanToDiary: (days: MealPlanDay[]) => Promise<{ success: boolean; error?: any }>;
+
 } | null>(null);
 
 // Provider component
@@ -562,8 +570,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // When auth state changes: sign in = load user; sign out = clear user so new signups get the right account
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event: any) => {
       if (event === 'SIGNED_IN') {
+
         await loadStoredData();
       } else if (event === 'SIGNED_OUT') {
         dispatch({ type: 'SET_USER', payload: null });
@@ -1925,8 +1934,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           // If Monday and Tuesday have same meals, update all days with different meals
           if (mondayMeals && tuesdayMeals && mondayMeals.length === tuesdayMeals.length) {
-            const sameMeals = mondayMeals.every((meal, index) => meal.title === tuesdayMeals[index]?.title);
+            const sameMeals = mondayMeals.every((meal: any, index: number) => meal.title === tuesdayMeals[index]?.title);
             if (sameMeals) {
+
               console.log('🔄 [Meal Plan] Detected old templated plan with same meals, updating...');
               await updateTemplatedMealPlanMeals(mealPlanData.id, existingDays);
             }
@@ -1962,8 +1972,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Load meals for each day
       const daysWithMeals = await Promise.all(
-        (daysData || []).map(async (day) => {
+        (daysData || []).map(async (day: any) => {
           const { data: mealsData, error: mealsError } = await supabase
+
             .from('meal_plan_meals')
             .select('*')
             .eq('meal_plan_day_id', day.id)
@@ -1976,8 +1987,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           // Load ingredients for each meal
           const mealsWithIngredients = await Promise.all(
-            (mealsData || []).map(async (meal) => {
+            (mealsData || []).map(async (meal: any) => {
               const { data: ingredientsData, error: ingredientsError } = await supabase
+
                 .from('meal_plan_ingredients')
                 .select('*')
                 .eq('meal_plan_meal_id', meal.id);
@@ -1992,13 +2004,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 mealType: meal.meal_type as 'breakfast' | 'snack' | 'lunch' | 'dinner',
                 mealOrder: meal.meal_order,
                 title: meal.title,
-                description: meal.description || undefined,
-                ingredients: (ingredientsData || []).map(ing => ({
+                description: meal.description,
+                calories: meal.calories,
+                protein: meal.protein,
+                carbs: meal.carbs,
+                fat: meal.fat,
+                ingredients: (ingredientsData || []).map((ing: any) => ({
                   id: ing.id,
                   name: ing.name,
-                  quantity: ing.quantity || undefined,
-                  unit: ing.unit || undefined,
-                  notes: ing.notes || undefined,
+                  quantity: ing.quantity,
+                  unit: ing.unit,
+                  notes: ing.notes,
                 })),
               };
             })
@@ -2508,6 +2524,101 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addMealToPlanDay = async (
+    dayOfWeek: number,
+    meal: Omit<MealPlanMeal, 'id'>
+  ): Promise<{ success: boolean; error?: any }> => {
+    try {
+      if (!state.activeMealPlan) {
+        return { success: false, error: new Error('No active meal plan') };
+      }
+
+      const day = state.activeMealPlan.days.find(d => d.dayOfWeek === dayOfWeek);
+      if (!day) {
+        return { success: false, error: new Error('Day not found') };
+      }
+
+      // Insert meal
+      const { data: mealData, error: mealError } = await supabase
+        .from('meal_plan_meals')
+        .insert({
+          meal_plan_day_id: day.id,
+          meal_type: meal.mealType,
+          meal_order: meal.mealOrder,
+          title: meal.title,
+          description: meal.description || null,
+        })
+        .select()
+        .single();
+
+      if (mealError) return { success: false, error: mealError };
+
+      // Insert ingredients
+      if (meal.ingredients && meal.ingredients.length > 0) {
+        const { error: ingError } = await supabase
+          .from('meal_plan_ingredients')
+          .insert(
+            meal.ingredients.map(ing => ({
+              meal_plan_meal_id: mealData.id,
+              name: ing.name,
+              quantity: ing.quantity || null,
+              unit: ing.unit || null,
+              notes: ing.notes || null,
+            }))
+          );
+        if (ingError) console.error('Error adding ingredients:', ingError);
+      }
+
+      await loadActiveMealPlan();
+      return { success: true };
+    } catch (error) {
+      console.error('Error adding meal to plan day:', error);
+      return { success: false, error };
+    }
+  };
+
+  const logMealPlanToDiary = async (days: MealPlanDay[]): Promise<{ success: boolean; error?: any }> => {
+    try {
+      const today = new Date();
+      const dayOfWeekToday = (today.getDay() + 6) % 7; // Monday=0, Sunday=6
+
+      for (const day of days) {
+        // Calculate date for this day of the week
+        // For now, assume it's for the current/next week
+        let diff = day.dayOfWeek - dayOfWeekToday;
+        if (diff < 0) diff += 7; // If day is earlier in week, move to next week
+
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + diff);
+        const dateStr = targetDate.toISOString().slice(0, 10);
+
+        for (const meal of day.meals) {
+          // Create a food item from the meal
+          // Default macros if not provided
+          const food: Omit<FoodItem, 'id' | 'timestamp'> = {
+            name: meal.title,
+            mealType: meal.mealType,
+            calories: meal.calories || 0,
+            protein: meal.protein || 0,
+            carbs: meal.carbs || 0,
+            fat: meal.fat || 0,
+            fiber: 0,
+            sugar: 0,
+            servingSize: '1 serving',
+            confidence: 1.0,
+          };
+
+
+          await addFoodItem(food, dateStr);
+        }
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error logging meal plan to diary:', error);
+      return { success: false, error };
+    }
+  };
+
   const setDefaultPreferencesByLocation = (country: string) => {
     const isMetricCountry = ['AU', 'CA', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'NO', 'DK', 'FI', 'NZ', 'ZA', 'IN', 'JP', 'KR', 'CN', 'BR', 'MX', 'AR', 'CL', 'CO', 'PE', 'UY', 'PY', 'BO', 'EC', 'VE', 'GY', 'SR', 'GF'].includes(country.toUpperCase());
     const isUSA = country.toUpperCase() === 'US';
@@ -2597,6 +2708,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateMealPlanDay,
         setActiveMealPlan,
         createMealPlanFromChat,
+        addMealToPlanDay,
+        logMealPlanToDiary,
+
       }}
     >
       {children}

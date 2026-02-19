@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DefaultTheme, NavigationContainer, useNavigationState, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,19 +13,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated as RNAnimated } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
-import { AppProvider } from './contexts/AppContext';
-import AlliChatScreen from './components/AlliChatScreen';
-import AlliScreen from './screens/AlliScreen';
-import HomeScreen from './screens/HomeScreen';
-import NutritionScreen from './screens/NutritionScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import NutritionScreen from './screens/NutritionScreen';
+import MealPlanScreen from './screens/MealPlanScreen';
+import AlliScreen from './screens/AlliScreen';
+import ComingSoonScreen from './screens/ComingSoonScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
+import { AppProvider, useApp } from './contexts/AppContext';
+import HomeScreen from './screens/HomeScreen';
 import AccountScreen from './screens/AccountScreen';
 import MenuScreen from './screens/MenuScreen';
-import ComingSoonScreen from './screens/ComingSoonScreen';
-import MealPlanScreen from './screens/MealPlanScreen';
-import OnboardingScreen from './screens/OnboardingScreen';
 import LoggingMenuModal from './components/LoggingMenuModal';
-import { useApp } from './contexts/AppContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -305,8 +304,7 @@ function LoginScreen({ navigation, onAuth }: any) {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Use Face ID to log in to Alli',
         fallbackLabel: 'Use Password Instead',
-        disableDeviceFallback: false, // Allow fallback on simulator
-        requireBiometrics: false, // Don't require on simulator
+        disableDeviceFallback: false,
       });
 
       if (result.success) {
@@ -513,7 +511,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               onPress={handleFaceIDLogin}
               disabled={loading}
             >
-              <Ionicons name="face-id" size={24} color="white" style={{ marginRight: 8 }} />
+              <Ionicons name="scan" size={24} color="white" style={{ marginRight: 8 }} />
               <Text style={styles.buttonText}>
                 {loading ? 'Authenticating...' : 'Log In with Face ID'}
               </Text>
@@ -577,20 +575,15 @@ function AuthStack({ onAuth }: any) {
 /** Renders Onboarding for new users, or MainApp (tabs + floating button) when onboarding is complete. Must be inside AppProvider. */
 function LoggedInRoot({
   onLogout,
-  showLoggingMenu,
-  onShowLoggingMenu,
-  onCloseLoggingMenu,
-  currentRoute,
   navigationRef,
 }: {
   onLogout: () => void;
-  showLoggingMenu: boolean;
-  onShowLoggingMenu: () => void;
-  onCloseLoggingMenu: () => void;
-  currentRoute: string | null;
   navigationRef: React.RefObject<NavigationContainerRef<any>>;
 }) {
   const { state, clearUser } = useApp();
+  const [showLoggingMenu, setShowLoggingMenu] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState<string | null>(null);
+
   const needsOnboarding = state.user && state.user.onboardingCompleted === false;
 
   const handleLogout = async () => {
@@ -598,20 +591,39 @@ function LoggedInRoot({
     onLogout();
   };
 
+  // Add listener for route changes
+  useEffect(() => {
+    const unsubscribe = navigationRef.current?.addListener('state', () => {
+      const state = navigationRef.current?.getState();
+      if (state) {
+        const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
+        if (mainAppRoute?.state) {
+          const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
+          setCurrentRoute(activeTab?.name || null);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigationRef]);
+
   if (!state.user) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <ActivityIndicator size="large" color="#0090A3" />
-        <Text style={{ marginTop: 12, color: '#333' }}>Setting up...</Text>
-      </View>
+        <Text style={{ marginTop: 12, color: '#0090A3', fontWeight: 'bold' }}>Alli is waking up...</Text>
+      </SafeAreaView>
     );
   }
 
   return (
     <>
       <MainTabNavigator onLogout={handleLogout} />
-      <FloatingLogButton onPress={onShowLoggingMenu} currentRoute={currentRoute} />
-      <LoggingMenuModal visible={showLoggingMenu} onClose={onCloseLoggingMenu} navigationRef={navigationRef} />
+      <FloatingLogButton onPress={() => setShowLoggingMenu(true)} currentRoute={currentRoute} />
+      <LoggingMenuModal
+        visible={showLoggingMenu}
+        onClose={() => setShowLoggingMenu(false)}
+        navigationRef={navigationRef as React.RefObject<NavigationContainerRef<any>>}
+      />
     </>
   );
 }
@@ -840,8 +852,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [bootTimedOut, setBootTimedOut] = useState(false);
-  const [showLoggingMenu, setShowLoggingMenu] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<string | null>(null);
+
   const navigationRef = React.useRef<NavigationContainerRef<any>>(null);
 
   useEffect(() => {
@@ -953,18 +964,18 @@ export default function App() {
       };
     }
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       console.log('Auth state changed:', event, !!session);
 
       if (event === 'SIGNED_IN' && session) {
         await AsyncStorage.setItem('isLoggedIn', 'true');
         await AsyncStorage.setItem('token', session.access_token);
-        setIsLoggedIn(true);
+        setIsLoggedIn(prev => prev === true ? prev : true);
         console.log('✅ User signed in - saved permanently');
       } else if (event === 'TOKEN_REFRESHED' && session) {
         await AsyncStorage.setItem('isLoggedIn', 'true');
         await AsyncStorage.setItem('token', session.access_token);
-        setIsLoggedIn(true);
+        setIsLoggedIn(prev => prev === true ? prev : true);
         console.log('✅ Token refreshed - user stays logged in');
       } else if (event === 'INITIAL_SESSION' && session) {
         // Already have a session (e.g. app restarted) - go to main app, don't show white/login
@@ -1024,6 +1035,22 @@ export default function App() {
     }
   };
 
+  const renderAuth = useCallback((props: any) => (
+    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+      <AuthStack {...props} onAuth={handleAuth} />
+    </View>
+  ), [handleAuth]);
+
+  const renderMain = useCallback((props: any) => (
+    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+      <LoggedInRoot
+        {...props}
+        onLogout={handleLogout}
+        navigationRef={navigationRef as React.RefObject<NavigationContainerRef<any>>}
+      />
+    </View>
+  ), []);
+
   if (loading && !bootTimedOut) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#CDC4B7', justifyContent: 'center', alignItems: 'center' }}>
@@ -1066,75 +1093,36 @@ export default function App() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-      <AppProvider>
-        <ErrorBoundary>
-          <NavigationContainer
-            ref={navigationRef}
-            theme={navTheme}
-            onReady={() => {
-              // Get initial route
-              const state = navigationRef.current?.getState();
-              if (state) {
-                const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
-                if (mainAppRoute?.state) {
-                  const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
-                  setCurrentRoute(activeTab?.name || null);
-                }
-              }
-            }}
-            onStateChange={() => {
-              // Update route when navigation state changes
-              const state = navigationRef.current?.getState();
-              if (state) {
-                const mainAppRoute = state.routes.find(r => r.name === 'MainApp');
-                if (mainAppRoute?.state) {
-                  const activeTab = mainAppRoute.state.routes[mainAppRoute.state.index || 0];
-                  setCurrentRoute(activeTab?.name || null);
-                }
-              }
-            }}
-          >
-            <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-              {updateAvailable && Platform.OS === 'web' && (
-                <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
-                  <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
-                  <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#0090A3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#CDC4B7' } }}>
-                {!isLoggedIn ? (
-                  <RootStack.Screen name="Auth">
-                    {() => (
-                      <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-                        <AuthStack onAuth={handleAuth} />
-                      </View>
-                    )}
-                  </RootStack.Screen>
-                ) : (
-                  <RootStack.Screen name="MainApp">
-                    {() => (
-                      <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
-                        <LoggedInRoot
-                          onLogout={handleLogout}
-                          showLoggingMenu={showLoggingMenu}
-                          onShowLoggingMenu={() => setShowLoggingMenu(true)}
-                          onCloseLoggingMenu={() => setShowLoggingMenu(false)}
-                          currentRoute={currentRoute}
-                          navigationRef={navigationRef}
-                        />
-                      </View>
-                    )}
-                  </RootStack.Screen>
+    <SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+        <AppProvider>
+          <ErrorBoundary>
+            <NavigationContainer
+              ref={navigationRef}
+              theme={navTheme}
+            >
+              <View style={{ flex: 1, backgroundColor: '#CDC4B7' }}>
+                {updateAvailable && Platform.OS === 'web' && (
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#111', padding: 12, zIndex: 9999 }}>
+                    <Text style={{ color: '#fff', textAlign: 'center' }}>Update available</Text>
+                    <TouchableOpacity onPress={() => (window as any).location.reload(true)} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#0090A3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                      <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reload</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
-              </RootStack.Navigator>
-            </View>
-          </NavigationContainer>
-        </ErrorBoundary>
-      </AppProvider>
-    </View>
+                <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#CDC4B7' } }}>
+                  {!isLoggedIn ? (
+                    <RootStack.Screen name="Auth" component={renderAuth} />
+                  ) : (
+                    <RootStack.Screen name="MainApp" component={renderMain} />
+                  )}
+                </RootStack.Navigator>
+              </View>
+            </NavigationContainer>
+          </ErrorBoundary>
+        </AppProvider>
+      </View>
+    </SafeAreaProvider>
   );
 }
 

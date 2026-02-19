@@ -19,6 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
+import { parseMealPlanFromMessage, MEAL_PLAN_SYSTEM_PROMPT } from '../lib/mealPlanUtils';
+import { ActivityIndicator } from 'react-native';
+
 // Import core LiveKit classes from livekit-client
 import {
   Room,
@@ -33,8 +36,8 @@ import {
   registerGlobals,
   AndroidAudioTypePresets,
 } from '@livekit/react-native';
-
 registerGlobals();
+
 
 // Configuration
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
@@ -116,6 +119,67 @@ const Typewriter = ({ text }: { text: string }) => {
 
   return <Text style={styles.aiMessageText}>{displayed}</Text>;
 };
+
+// Add to Food Plan button component
+function MealPlanButton({ content }: { content: string }) {
+  const { createMealPlanFromChat } = useApp();
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  const mealPlan = React.useMemo(() => {
+    const parsed = parseMealPlanFromMessage(content);
+    if (!parsed && content.includes('{') && content.includes('}')) {
+      console.log(`[MealPlanBtn] Unsuccessful parse. Content contains braces but failed. Sample: ${content.slice(-200)}`);
+    }
+    console.log(`[MealPlanBtn] parsed success: ${!!parsed}`);
+    return parsed;
+  }, [content]);
+
+  if (!mealPlan) return null;
+
+  const handleAddPlan = async () => {
+    setAdding(true);
+    try {
+      const result = await createMealPlanFromChat(mealPlan);
+      if (result.success) {
+        setAdded(true);
+        Alert.alert('Success', 'Meal plan has been added to your profile!');
+      } else {
+        const errorMsg = (result as any).error?.message || 'Failed to add meal plan. Please try again.';
+        Alert.alert('Error', errorMsg);
+      }
+    } catch (error) {
+      console.error('Error adding meal plan:', error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleAddPlan}
+      style={[styles.mealPlanBtn, added && styles.mealPlanBtnSuccess]}
+      disabled={adding || added}
+    >
+      {adding ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <>
+          <Ionicons
+            name={added ? 'checkmark-circle' : 'restaurant-outline'}
+            size={18}
+            color="#fff"
+          />
+          <Text style={styles.mealPlanBtnText}>
+            {added ? 'Added to Food Plan' : 'Add to Food Plan'}
+          </Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 
 interface AlliScreenProps {
   navigation: any;
@@ -237,7 +301,8 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
 
     try {
       const systemPrompt =
-        `You are Alli, a friendly and supportive nutrition assistant. Your goal is to help people eat better and feel healthier.
+        `You are Alli, a friendly and supportive nutrition assistant.
+${MEAL_PLAN_SYSTEM_PROMPT}
 
 IMPORTANT RULES FOR HOW YOU RESPOND:
 
@@ -272,73 +337,143 @@ IMPORTANT RULES FOR HOW YOU RESPOND:
    - Acknowledge when something is debated or uncertain
    - Don't promise specific results
 
-Remember: Your user might be confused, overwhelmed, or just starting their health journey. Make nutrition feel approachable and doable, not complicated or scary.`;
+Remember: Your user might be confused, overwhelmed, or just starting their health journey. Make nutrition feel approachable and doable, not complicated or scary.
+`;
 
-
-      // Filter out pending messages when sending to API
+      // Filter out pending messages and STRIP JSON from history to save tokens
       const messagesToSend = [
         { role: 'system' as const, content: systemPrompt },
-        ...messages.filter(m => !m.pending).map(m => ({ role: m.isUser ? 'user' as const : 'assistant' as const, content: m.text })),
+        ...messages
+          .filter(m => !m.pending)
+          .map(m => ({
+            role: m.isUser ? 'user' as const : 'assistant' as const,
+            content: m.isUser ? m.text : m.text.replace(/```json[\s\S]*?```/g, '').trim()
+          })),
         { role: 'user' as const, content: question }
       ];
 
       let assistantText = '';
       let novitaError = '';
 
-      // 1. Try Novita API with 10s timeout
+      // 1. Try Novita API with 30s timeout
       try {
+        console.log('🚀 Sending request to Novita...');
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Novita TIMED OUT after 30s');
+          controller.abort();
+        }, 30000);
 
         const res = await fetch(NOVITA_API_URL as string, {
           method: 'POST',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${NOVITA_API_KEY}`,
+            'Authorization': `Bearer ${NOVITA_API_KEY?.trim()}`,
           },
           body: JSON.stringify({
             model: NOVITA_MODEL,
             messages: messagesToSend,
             temperature: 0.3,
-            max_tokens: 800,
-            reasoning: { enabled: false }
+            max_tokens: 1500,
+            reasoning: { enabled: false },
           }),
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
+        console.log('📡 Novita status:', res.status, res.statusText);
 
         if (res.ok) {
           const json = await res.json();
           assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
+          console.log('✅ Novita responded. Has json block:', assistantText.includes('```json'));
         } else {
+          const errBody = await res.text().catch(() => 'No body');
+          console.log('❌ Novita error body:', errBody);
           novitaError = `Status ${res.status}`;
-          console.log(`Novita failed with ${res.status}, trying fallback...`);
         }
       } catch (e: any) {
+        console.log('❌ Novita exception type:', e.name);
+        console.log('❌ Novita exception message:', e.message);
         novitaError = e.message;
-        console.log(`Novita execution failed: ${e.message}, trying fallback...`);
       }
 
-      // 2. Fallback to RAG if needed
       if (!assistantText && RAG_FALLBACK_URL) {
         try {
+          await new Promise(resolve => setTimeout(resolve, 1000));
           console.log('Falling back to RAG endpoint...');
+
+          // If it's a meal plan request, use a more concise prompt for the backup
+          const isMealPlanRequest = question.toLowerCase().includes('meal') || question.toLowerCase().includes('plan');
+          const promptForRAG = isMealPlanRequest
+            ? `${question}\n\n(Important: Provide a 2-day plan with hidden JSON block. No comments in JSON.)`
+            : question;
+
           const ragRes = await fetch(RAG_FALLBACK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: question }),
+            body: JSON.stringify({
+              input: promptForRAG,
+              timestamp: Date.now()
+            }),
           });
 
           if (ragRes.ok) {
-            const ragJson = await ragRes.json().catch(() => ({}));
-            assistantText = String(ragJson.output || ragJson.response || ragJson.text || ragJson.message || (typeof ragJson === 'string' ? ragJson : '')).trim();
+            let ragJson = await ragRes.json().catch(() => ({}));
+            console.log('✅ RAG raw response:', JSON.stringify(ragJson));
+
+            if (Array.isArray(ragJson) && ragJson.length > 0) ragJson = ragJson[0];
+
+            assistantText = String(
+              ragJson.output ||
+              ragJson.response ||
+              ragJson.text ||
+              ragJson.message ||
+              (ragJson.data && (ragJson.data.output || ragJson.data.text || ragJson.data.response)) ||
+              (typeof ragJson === 'string' ? ragJson : '')
+            ).trim();
+
+            console.log('✅ RAG responded. Length:', assistantText.length);
+          } else {
+            const errText = await ragRes.text().catch(() => 'No error body');
+            console.log('❌ RAG failed. Status:', ragRes.status, 'Body:', errText);
           }
         } catch (ragErr) {
           console.error('RAG Fallback failed:', ragErr);
         }
       }
+
+
+      // if (!assistantText) {
+      //   try {
+      //     const fallbackRes = await fetch('https://api.anthropic.com/v1/messages', {
+      //       method: 'POST',
+      //       headers: {
+      //         'Content-Type': 'application/json',
+      //         'x-api-key': process.env.EXPO_PUBLIC_ANTHROPIC_KEY as string,
+      //         'anthropic-version': '2023-06-01',
+      //       },
+      //       body: JSON.stringify({
+      //         model: 'claude-haiku-4-5-20251001',
+      //         max_tokens: 1500,
+      //         system: systemPrompt,
+      //         messages: [{ role: 'user', content: question }],
+      //       }),
+      //     });
+      //     if (fallbackRes.ok) {
+      //       const j = await fallbackRes.json();
+      //       assistantText = j?.content?.[0]?.text || '';
+      //     }
+      //   } catch (e: any) {
+      //     console.error('Claude fallback failed:', e.message);
+      //   }
+      // }
+      // ```
+
+      // Add to `.env`:
+      // ```
+      // EXPO_PUBLIC_ANTHROPIC_KEY=sk-ant-...
 
       if (assistantText) {
         const aiMessage: Message = {
@@ -358,7 +493,7 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
       }
     } catch (error: any) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', `Failed to get response: ${error.message}`);
+      Alert.alert('Error', `Failed to get response: ${error.message} `);
       // Remove optimistic pending message on error
       setMessages(prev => prev.filter(m => m.id !== optimisticAI.id));
     } finally {
@@ -384,16 +519,19 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
 
   const setupAudioSession = async () => {
     try {
+      console.log('🎙️ Configuring AudioSession...');
       await AudioSession.configureAudio({
         android: {
           preferredOutputList: ['speaker'],
-          audioTypeOptions: AndroidAudioTypePresets.Communication,
+          audioTypeOptions: AndroidAudioTypePresets.communication,
         },
         ios: {
           defaultOutput: 'speaker',
         },
       });
+      console.log('🎙️ Starting AudioSession...');
       await AudioSession.startAudioSession();
+      console.log('🎙️ AudioSession started.');
     } catch (err) {
       console.error('❌ Error configuring AudioSession:', err);
     }
@@ -407,7 +545,7 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
     }
   };
 
-  const connectToRoom = async (token: string) => {
+  const connectToRoom = async (token: string, serverUrl?: string) => {
     try {
       setAgentState('connecting');
       setConnectionError(null);
@@ -514,6 +652,31 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
         }, 1000);
       });
 
+      r.on(RoomEvent.DataReceived, (payload, participant) => {
+        try {
+          const decoder = new TextDecoder();
+          const strData = decoder.decode(payload);
+          const data = JSON.parse(strData);
+          console.log('📦 Data received from participant:', participant?.identity, data);
+
+          if (data.type === 'meal_plan' || data.days) {
+            console.log('📦 Structured meal plan received via data channel!');
+            // Add a virtual message to the chat that contains the meal plan button
+            const aiMessageFinal: Message = {
+              id: `data-plan-${Date.now()}`,
+              text: `I've generated a specific meal plan for you. \n\n\`\`\`json\n${JSON.stringify(data)}\n\`\`\``,
+              isUser: false,
+              timestamp: new Date(),
+              type: 'text',
+            };
+
+            setMessages(prev => [...prev, aiMessageFinal]);
+          }
+        } catch (e) {
+          console.log('📦 Non-JSON or invalid data received');
+        }
+      });
+
       r.on(RoomEvent.Disconnected, (reason) => {
         console.log('❌ Disconnected from LiveKit room:', reason);
         if (connectionTimeoutRef.current) {
@@ -540,8 +703,12 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
       });
       setLocalTrack(track);
 
-      await r.connect(LIVEKIT_URL, token);
+      const url = serverUrl || LIVEKIT_URL;
+      console.log('🏠 Connecting to Room:', url);
+      await r.connect(url, token);
+      console.log('🏠 Connected to Room. Publishing track...');
       await r.localParticipant.publishTrack(track);
+      console.log('🏠 Track published.');
 
       setRoom(r);
     } catch (err: any) {
@@ -591,11 +758,17 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
       }
 
       const data = await response.json();
+      console.log('🔑 Backend response keys:', Object.keys(data?.data || {}));
+      if (data?.data?.url) {
+        console.log('🔑 Backend provided URL:', data.data.url);
+      }
+
       if (!data?.data?.token) {
+        console.log('🔑 Backend response full data:', JSON.stringify(data));
         throw new Error('No token received from backend');
       }
 
-      await connectToRoom(data.data.token);
+      await connectToRoom(data.data.token, data.data.url);
     } catch (err: any) {
       console.error('❌ Error getting token:', err);
 
@@ -687,6 +860,12 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
         </View>
       );
     }
+
+    const displayText = message.text
+      .replace(/```json[\s\S]*?```/g, '')
+      .replace(/(\{[\s\S]*?("type"|"days")[\s\S]*?\})/g, '')
+      .trim() || "...";
+
     return (
       <View
         key={message.id}
@@ -702,7 +881,7 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
           ]}
         >
           {isLast && !message.isUser ? (
-            <Typewriter text={message.text} />
+            <Typewriter text={displayText} />
           ) : (
             <Text
               style={[
@@ -710,8 +889,14 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
                 message.isUser ? styles.userMessageText : styles.aiMessageText,
               ]}
             >
-              {message.text}
+              {displayText}
             </Text>
+          )}
+          {!message.isUser && (
+            <MealPlanButton
+              key={`meal-btn-${message.id}`}
+              content={message.text}
+            />
           )}
           <Text
             style={[
@@ -719,7 +904,9 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
               message.isUser ? styles.userTimestamp : styles.aiTimestamp,
             ]}
           >
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {message.timestamp instanceof Date
+              ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : 'Recently'}
           </Text>
         </View>
       </View>
@@ -1160,5 +1347,24 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#6E006A',
     marginHorizontal: 3,
+  },
+  mealPlanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0090A3',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  mealPlanBtnSuccess: {
+    backgroundColor: '#10B981',
+  },
+  mealPlanBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
