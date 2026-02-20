@@ -31,7 +31,7 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 
 export default function MealPlanScreen() {
   const tabBarHeight = useBottomTabBarHeight();
-  const { state, loadActiveMealPlan, createTemplatedMealPlan } = useApp();
+  const { state, loadActiveMealPlan, createTemplatedMealPlan, addMealToPlanDay, logMealPlanToDiary } = useApp();
   const activeMealPlan = (state as any).activeMealPlan as MealPlan | null;
 
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,6 @@ export default function MealPlanScreen() {
     mealType: 'breakfast' as any,
   });
   const [loggingPlan, setLoggingPlan] = useState(false);
-
 
   const refresh = async () => {
     setRefreshing(true);
@@ -61,11 +60,11 @@ export default function MealPlanScreen() {
 
     setLoading(true);
     try {
-      const result = await (state as any).addMealToPlanDay(selectedDay, {
+      const result = await addMealToPlanDay(selectedDay, {
         title: newMeal.title,
         description: newMeal.description,
         mealType: newMeal.mealType,
-        mealOrder: 0, // Simplified
+        mealOrder: 0,
         ingredients: [],
       });
       if (result.success) {
@@ -83,7 +82,7 @@ export default function MealPlanScreen() {
     if (!activeMealPlan) return;
     setLoggingPlan(true);
     try {
-      const result = await (state as any).logMealPlanToDiary(activeMealPlan.days);
+      const result = await logMealPlanToDiary(activeMealPlan.days);
       if (result.success) {
         Alert.alert('Success', 'Today\'s meals from your plan have been added to your Diary!');
       } else {
@@ -125,7 +124,7 @@ export default function MealPlanScreen() {
     );
   }
 
-  const hasPlan = activeMealPlan?.days?.length > 0;
+  const hasPlan = (activeMealPlan?.days?.length || 0) > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -161,7 +160,6 @@ export default function MealPlanScreen() {
           )}
         </View>
 
-
         {!hasPlan ? (
           <View style={styles.emptyBlock}>
             <MaterialCommunityIcons name="silverware-fork-knife" size={56} color="#0090A3" />
@@ -194,7 +192,7 @@ export default function MealPlanScreen() {
           </View>
         ) : (
           <>
-            {activeMealPlan.days
+            {(activeMealPlan?.days || [])
               .slice()
               .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
               .map((day: MealPlanDay) => (
@@ -238,7 +236,6 @@ export default function MealPlanScreen() {
         )}
       </ScrollView>
 
-      {/* Manual Add Modal */}
       <Modal visible={showMealModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -285,7 +282,6 @@ export default function MealPlanScreen() {
         </View>
       </Modal>
     </SafeAreaView>
-
   );
 }
 
@@ -366,10 +362,12 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   dayCard: {
-    backgroundColor: '#E6E1D8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#0090A3',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -536,4 +534,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

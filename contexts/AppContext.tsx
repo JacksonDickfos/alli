@@ -1891,7 +1891,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', authUserId)
         .eq('is_active', true)
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows gracefully
+        .maybeSingle();
+
+      console.log('📊 [Meal Plan] Active plan found?', !!mealPlanData);
+      if (mealPlanError) console.error('❌ [Meal Plan] Query error:', mealPlanError);
 
       console.log('📊 [Meal Plan] Query result:', { mealPlanData: mealPlanData ? 'Found' : 'Not found', error: mealPlanError });
 
@@ -1966,15 +1969,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .order('day_of_week', { ascending: true });
 
       if (daysError) {
-        console.error('Error loading meal plan days:', daysError);
+        console.error('❌ [Meal Plan] Error loading days:', daysError);
         return;
       }
+      console.log(`📅 [Meal Plan] Found ${daysData?.length || 0} days for plan ${mealPlanData.id}`);
 
       // Load meals for each day
       const daysWithMeals = await Promise.all(
         (daysData || []).map(async (day: any) => {
           const { data: mealsData, error: mealsError } = await supabase
-
             .from('meal_plan_meals')
             .select('*')
             .eq('meal_plan_day_id', day.id)
@@ -2028,6 +2031,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })
       );
 
+      const totalMeals = daysWithMeals.reduce((acc, day) => acc + (day.meals?.length || 0), 0);
+      console.log(`🍲 [Meal Plan] Loaded ${daysWithMeals.length} days with total ${totalMeals} meals.`);
       const mealPlan: MealPlan = {
         id: mealPlanData.id,
         userId: mealPlanData.user_id,
@@ -2432,8 +2437,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { data: userData } = await supabase.auth.getUser();
       const authUserId = userData?.user?.id;
       if (!authUserId) {
+        console.error('❌ [Chat Plan] No user ID during creation');
         return { success: false, error: new Error('Not logged in') };
       }
+      console.log('🚀 [Chat Plan] Starting creation for user:', authUserId);
 
       // Deactivate existing active meal plan
       await supabase
@@ -2454,10 +2461,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (mealPlanError) {
-        console.error('Error creating meal plan:', mealPlanError);
+        console.error('❌ [Chat Plan] Error creating header:', mealPlanError);
         return { success: false, error: mealPlanError };
       }
-
+      console.log('✅ [Chat Plan] Header created with ID:', mealPlanData.id);
       // Create days and meals
       for (const day of days) {
         const { data: dayData, error: dayError } = await supabase
@@ -2515,7 +2522,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       // Reload the meal plan
+      console.log('🔄 [Chat Plan] Creation complete, reloading state...');
       await loadActiveMealPlan();
+      console.log('✨ [Chat Plan] State reload finished.');
 
       return { success: true, mealPlanId: mealPlanData.id };
     } catch (error) {

@@ -21,6 +21,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
 import { parseMealPlanFromMessage, MEAL_PLAN_SYSTEM_PROMPT } from '../lib/mealPlanUtils';
 import { ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: 'Breakfast',
+  snack: 'Snack',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+};
 
 // Import core LiveKit classes from livekit-client
 import {
@@ -123,14 +132,12 @@ const Typewriter = ({ text }: { text: string }) => {
 // Add to Food Plan button component
 function MealPlanButton({ content }: { content: string }) {
   const { createMealPlanFromChat } = useApp();
+  const navigation = useNavigation<any>();
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
 
   const mealPlan = React.useMemo(() => {
     const parsed = parseMealPlanFromMessage(content);
-    if (!parsed && content.includes('{') && content.includes('}')) {
-      console.log(`[MealPlanBtn] Unsuccessful parse. Content contains braces but failed. Sample: ${content.slice(-200)}`);
-    }
     console.log(`[MealPlanBtn] parsed success: ${!!parsed}`);
     return parsed;
   }, [content]);
@@ -143,7 +150,14 @@ function MealPlanButton({ content }: { content: string }) {
       const result = await createMealPlanFromChat(mealPlan);
       if (result.success) {
         setAdded(true);
-        Alert.alert('Success', 'Meal plan has been added to your profile!');
+        Alert.alert(
+          'Success',
+          'Meal plan has been added to your profile!',
+          [
+            { text: 'Wait here', style: 'cancel' },
+            { text: 'View Plan', onPress: () => navigation.navigate('Plan') }
+          ]
+        );
       } else {
         const errorMsg = (result as any).error?.message || 'Failed to add meal plan. Please try again.';
         Alert.alert('Error', errorMsg);
@@ -157,26 +171,54 @@ function MealPlanButton({ content }: { content: string }) {
   };
 
   return (
-    <TouchableOpacity
-      onPress={handleAddPlan}
-      style={[styles.mealPlanBtn, added && styles.mealPlanBtnSuccess]}
-      disabled={adding || added}
-    >
-      {adding ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <>
-          <Ionicons
-            name={added ? 'checkmark-circle' : 'restaurant-outline'}
-            size={18}
-            color="#fff"
-          />
-          <Text style={styles.mealPlanBtnText}>
-            {added ? 'Added to Food Plan' : 'Add to Food Plan'}
+    <View style={styles.mealPlanPreviewContainer}>
+      {mealPlan.map((day, idx) => (
+        <View key={day.id || idx} style={styles.dayPreviewCard}>
+          <Text style={styles.dayPreviewTitle}>
+            {DAY_NAMES[day.dayOfWeek] || `Day ${day.dayOfWeek + 1}`}
           </Text>
-        </>
-      )}
-    </TouchableOpacity>
+
+          {(day.meals || []).map((meal, mIdx) => (
+            <View key={meal.id || mIdx} style={styles.mealPreviewRow}>
+              <View style={styles.mealTypePreviewBadge}>
+                <Text style={styles.mealTypePreviewText}>
+                  {MEAL_TYPE_LABELS[meal.mealType] || meal.mealType}
+                </Text>
+              </View>
+              <View style={styles.mealPreviewContent}>
+                <Text style={styles.mealPreviewTitle}>{meal.title}</Text>
+                {meal.description ? (
+                  <Text style={styles.mealPreviewDescription} numberOfLines={1}>
+                    {meal.description}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+
+      <TouchableOpacity
+        onPress={handleAddPlan}
+        style={[styles.mealPlanBtn, added && styles.mealPlanBtnSuccess]}
+        disabled={adding || added}
+      >
+        {adding ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Ionicons
+              name={added ? 'checkmark-circle' : 'restaurant-outline'}
+              size={18}
+              color="#fff"
+            />
+            <Text style={styles.mealPlanBtnText}>
+              {added ? 'Added to Food Plan' : 'Add to Food Plan'}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1366,5 +1408,64 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  mealPlanPreviewContainer: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    padding: 8,
+    width: '100%',
+  },
+  dayPreviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#0090A3',
+  },
+  dayPreviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0090A3',
+    marginBottom: 8,
+  },
+  mealPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  mealTypePreviewBadge: {
+    backgroundColor: '#0090A3',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    minWidth: 60,
+  },
+  mealTypePreviewText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  mealPreviewContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  mealPreviewTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2A2A2A',
+  },
+  mealPreviewDescription: {
+    fontSize: 11,
+    color: '#666',
+  },
+  moreDaysText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginBottom: 8,
+    textAlign: 'center',
   },
 });
