@@ -50,7 +50,7 @@ registerGlobals();
 
 // Configuration
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://62.72.35.123:8003/start_call2';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
 const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
 const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
 const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
