@@ -442,6 +442,19 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           const todayIdx = (new Date().getDay() + 6) % 7; // Monday=0
           const todayPlan = activePlan.days.find(d => d.dayOfWeek === todayIdx);
 
+          if (!todayPlan || !Array.isArray(todayPlan.meals) || todayPlan.meals.length === 0) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+                  Upcoming Meal
+                </Text>
+                <Text style={{ textAlign: 'center', color: '#666' }}>
+                  No meals planned for today.
+                </Text>
+              </View>
+            );
+          }
+
           if (!todayPlan) {
             return (
               <View style={styles.cardBlock}>
@@ -467,7 +480,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
           // Find next meal
           const currentHour = new Date().getHours();
-          let nextMeal = todayPlan.meals.find(m => {
+          const safeMeals = todayPlan.meals.filter(Boolean);
+
+          let nextMeal = safeMeals.find(m => {
             if (m.mealType === 'breakfast' && currentHour < 10) return true;
             if (m.mealType === 'snack' && m.mealOrder === 1 && currentHour < 12) return true;
             if (m.mealType === 'lunch' && currentHour < 15) return true;
@@ -476,7 +491,22 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             return false;
           });
 
-          if (!nextMeal) nextMeal = todayPlan.meals[todayPlan.meals.length - 1];
+          if (!nextMeal && safeMeals.length > 0) {
+            nextMeal = safeMeals[safeMeals.length - 1];
+          }
+
+          if (!nextMeal) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+                  Upcoming Meal
+                </Text>
+                <Text style={{ textAlign: 'center', color: '#666' }}>
+                  No meals scheduled.
+                </Text>
+              </View>
+            );
+          }
 
           return (
             <View style={styles.cardBlock}>

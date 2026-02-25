@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6E1D8',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: 100,
+    // paddingBottom: 100,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
