@@ -1,5 +1,6 @@
 const path = require('path');
 const dotenv = require('dotenv');
+const { AccessToken } = require('livekit-server-sdk');
 
 // Load env vars from repo root AND backend/.env (backend wins)
 dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -254,6 +255,50 @@ app.post('/login', async (req, res) => {
 
 app.get('/message', (req, res) => {
   res.json({ message: 'Hello from your backend API!' });
+});
+
+// LiveKit token generation
+app.post('/start_call2', async (req, res) => {
+  try {
+    console.log('📨 Received /start_call2 request');
+    const { agent_id, roomName } = req.body;
+    const apiKey = (process.env.LIVEKIT_API_KEY || '').trim();
+    const apiSecret = (process.env.LIVEKIT_API_SECRET || '').trim();
+    const livekitUrl = (process.env.EXPO_PUBLIC_LIVEKIT_URL || '').trim();
+
+    if (!apiKey || !apiSecret || !livekitUrl) {
+      console.error('❌ LiveKit credentials not configured in .env');
+      console.log('DEBUG: apiKey length:', apiKey?.length);
+      console.log('DEBUG: apiSecret length:', apiSecret?.length);
+      console.log('DEBUG: livekitUrl:', livekitUrl);
+      return res.status(500).json({ error: 'LiveKit credentials not configured' });
+    }
+
+    const identity = `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const rName = roomName || `room-${Date.now()}`;
+
+    const at = new AccessToken(apiKey, apiSecret, { identity });
+    at.addGrant({
+      roomJoin: true,
+      room: rName,
+      canPublish: true,
+      canSubscribe: true
+    });
+
+    const token = at.toJwt();
+    console.log(`✅ Generated LiveKit token. Length: ${token.length}, Identity: ${identity}, Room: ${rName}`);
+    console.log(`🔗 Connecting to: ${livekitUrl}`);
+
+    res.json({
+      data: {
+        token,
+        url: livekitUrl
+      }
+    });
+  } catch (err) {
+    console.error('❌ LiveKit token generation error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Passio image recognition endpoint (proxy)

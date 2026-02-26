@@ -36,7 +36,7 @@ import {
 
 registerGlobals();
 
-const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
+const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://tgs-g8ihpbv8.livekit.cloud';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
 const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
 const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
@@ -595,14 +595,19 @@ ${MEAL_PLAN_SYSTEM_PROMPT}`;
     }
     setAgentState('connecting'); setConnectionError(null);
     try {
+      console.log('🔄 Fetching LiveKit token from:', BACKEND_URL);
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: '123', roomName: `room-123-${Date.now()}` }),
+        body: JSON.stringify({ agent_id: '123' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data?.data?.token) throw new Error('No token received');
+
+      console.log('✅ Received token. Length:', data.data.token.length);
+      console.log('🔗 Room URL:', data.data.url);
+
       await connectToRoom(data.data.token, data.data.url);
     } catch (err: any) {
       setConnectionError(err.message);
