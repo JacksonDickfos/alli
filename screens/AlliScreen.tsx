@@ -37,10 +37,11 @@ import {
 registerGlobals();
 
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://62.72.35.123:8003/start_call2';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
 const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
 const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
 const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 const RAG_FALLBACK_URL = process.env.EXPO_PUBLIC_RAG_FALLBACK_URL;
 
 interface Message {
@@ -388,27 +389,32 @@ HOW TO RESPOND:
       } catch (e: any) {
         console.log('❌ Novita failed:', e.message);
       }
-
-      // ── 2. RAG fallback ────────────────────────────────────────────────────
-      if (!assistantText && RAG_FALLBACK_URL) {
+      // ── 2. OpenAI Fallback ──────────────────────────────────────────────────
+      if (!assistantText && OPENAI_API_KEY) {
         try {
-          await new Promise(r => setTimeout(r, 800));
-          console.log('🔄 Falling back to RAG...');
-
-          const ragRes = await fetch(RAG_FALLBACK_URL, {
+          console.log('🔄 Falling back to OpenAI...');
+          const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: question, timestamp: Date.now() }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${OPENAI_API_KEY.trim()}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: messagesToSend,
+              temperature: 0.7,
+            }),
           });
 
-          if (ragRes.ok) {
-            assistantText = await extractRagResponse(ragRes);
-            console.log('✅ RAG final length:', assistantText.length);
+          if (openAiRes.ok) {
+            const data = await openAiRes.json();
+            assistantText = data?.choices?.[0]?.message?.content?.trim() || '';
+            console.log('✅ OpenAI responded. Length:', assistantText.length);
           } else {
-            console.log('❌ RAG HTTP error:', ragRes.status, ragRes.statusText);
+            console.log('❌ OpenAI HTTP error:', openAiRes.status);
           }
         } catch (e) {
-          console.error('❌ RAG request threw:', e);
+          console.error('❌ OpenAI request failed:', e);
         }
       }
 
