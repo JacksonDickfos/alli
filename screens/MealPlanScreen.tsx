@@ -31,12 +31,13 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 
 export default function MealPlanScreen() {
   const tabBarHeight = useBottomTabBarHeight();
-  const { state, loadActiveMealPlan, createTemplatedMealPlan, addMealToPlanDay, logMealPlanToDiary } = useApp();
+  const { state, loadActiveMealPlan, createTemplatedMealPlan, addMealToPlanDay, logMealPlanToDiary, deleteMealPlan } = useApp();
   const activeMealPlan = (state as any).activeMealPlan as MealPlan | null;
 
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showMealModal, setShowMealModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [newMeal, setNewMeal] = useState({
@@ -93,6 +94,33 @@ export default function MealPlanScreen() {
     }
   };
 
+  const handleDeletePlan = () => {
+    Alert.alert(
+      'Delete Meal Plan',
+      'Are you sure you want to delete your current meal plan? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const res = await deleteMealPlan();
+              if (res.success) {
+                // optional: show success toast or it simply disappears since hasPlan becomes false
+              } else {
+                Alert.alert('Error', 'Could not delete meal plan.');
+              }
+            } finally {
+              setDeleting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   useEffect(() => {
     refresh();
   }, []);
@@ -138,25 +166,38 @@ export default function MealPlanScreen() {
         <View style={styles.headerRow}>
           <Text style={styles.screenTitle}>Meal Plan</Text>
           {hasPlan && (
-            <TouchableOpacity
-              style={styles.logPlanBtn}
-              onPress={handleLogPlanToDiary}
-              disabled={loggingPlan}
-            >
-              <LinearGradient
-                colors={['#0090A3', '#28657A']}
-                style={styles.logPlanGradient}
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.deletePlanBtn}
+                onPress={handleDeletePlan}
+                disabled={deleting}
               >
-                {loggingPlan ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#E53935" />
                 ) : (
-                  <>
-                    <Ionicons name="journal-outline" size={18} color="#fff" />
-                    <Text style={styles.logPlanText}>Log to Diary</Text>
-                  </>
+                  <Ionicons name="trash-outline" size={20} color="#E53935" />
                 )}
-              </LinearGradient>
-            </TouchableOpacity>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.logPlanBtn}
+                onPress={handleLogPlanToDiary}
+                disabled={loggingPlan}
+              >
+                <LinearGradient
+                  colors={['#0090A3', '#28657A']}
+                  style={styles.logPlanGradient}
+                >
+                  {loggingPlan ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="journal-outline" size={18} color="#fff" />
+                      <Text style={styles.logPlanText}>Log to Diary</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -422,6 +463,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deletePlanBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(229, 57, 53, 0.1)',
+    borderRadius: 12,
   },
   dayHeader: {
     flexDirection: 'row',

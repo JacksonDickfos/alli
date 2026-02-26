@@ -105,18 +105,13 @@ function Typewriter({ text }: { text: string }) {
 }
 
 // ─── Add to Meal Plan Button ─────────────────────────────────────────────────
-// Renders ONLY when the AI message contains a valid meal plan JSON.
-// Sits BELOW the chat bubble, full width.
 function AddToMealPlanButton({ content }: { content: string }) {
   const { createMealPlanFromChat } = useApp();
   const navigation = useNavigation<any>();
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
 
-  // Parse once and cache
   const mealPlan = React.useMemo(() => parseMealPlanFromMessage(content), [content]);
-
-  // Don't render at all if there's no plan in this message
   if (!mealPlan || mealPlan.length === 0) return null;
 
   const handlePress = async () => {
@@ -168,6 +163,79 @@ function AddToMealPlanButton({ content }: { content: string }) {
       )}
     </TouchableOpacity>
   );
+}
+
+// ─── RAG response extractor ───────────────────────────────────────────────────
+// THE FIX: reads body as raw text first (never silently fails like .json() does),
+// then intelligently parses JSON and checks every known field name.
+async function extractRagResponse(ragRes: Response): Promise<string> {
+  // Step 1 — always read as text. This never throws unlike .json()
+  const rawText = await ragRes.text();
+  console.log('🔍 RAG raw body (first 400):', rawText.slice(0, 400));
+
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+
+  // Step 2 — if not JSON-shaped, return as plain text directly
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    console.log('✅ RAG plain text response');
+    return trimmed;
+  }
+
+  // Step 3 — parse JSON
+  let j: any;
+  try {
+    j = JSON.parse(trimmed);
+  } catch {
+    console.warn('⚠️ RAG looked like JSON but failed to parse — returning raw');
+    return trimmed;
+  }
+
+  // Step 4 — unwrap array e.g. [{ ... }]
+  if (Array.isArray(j) && j.length > 0) j = j[0];
+
+  console.log('🔍 RAG parsed keys:', Object.keys(j ?? {}));
+
+  // Step 5 — already a bare string
+  if (typeof j === 'string') return j.trim();
+
+  // Step 6 — check every field name across all known RAG/LLM API shapes
+  const candidates: Array<string | undefined> = [
+    j?.output,
+    j?.response,
+    j?.text,
+    j?.message,
+    j?.answer,
+    j?.result,
+    j?.content,
+    j?.reply,
+    j?.generated_text,
+    j?.completion,
+    j?.bot,
+    j?.assistant,
+    // OpenAI-compatible
+    j?.choices?.[0]?.message?.content,
+    j?.choices?.[0]?.text,
+    // nested under data
+    j?.data?.output,
+    j?.data?.response,
+    j?.data?.text,
+    j?.data?.message,
+    j?.data?.answer,
+    j?.data?.result,
+    j?.data?.content,
+    j?.data?.reply,
+  ];
+
+  for (const c of candidates) {
+    if (c && typeof c === 'string' && c.trim().length > 0) {
+      return c.trim();
+    }
+  }
+
+  // Step 7 — nothing matched; log the full object so the correct key is visible
+  console.warn('⚠️ RAG: no known field matched. Full object:', JSON.stringify(j));
+  return '';
 }
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -281,16 +349,23 @@ HOW TO RESPOND:
 
       let assistantText = '';
 
-      // 1. Try Novita
+      // ── 1. Novita ──────────────────────────────────────────────────────────
       try {
         const controller = new AbortController();
-        const tid = setTimeout(() => { console.log('⏰ Novita timeout'); controller.abort(); }, 10000);
+        const isMealPlan =
+          question.toLowerCase().includes('plan') ||
+          question.toLowerCase().includes('diet');
+        const tid = setTimeout(() => {
+          console.log('⏰ Novita timeout');
+          controller.abort();
+        }, isMealPlan ? 45_000 : 20_000);
+
         const res = await fetch(NOVITA_API_URL as string, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${NOVITA_API_KEY?.trim()}`,
+            Authorization: `Bearer ${NOVITA_API_KEY?.trim()}`,
           },
           body: JSON.stringify({
             model: NOVITA_MODEL,
@@ -302,39 +377,42 @@ HOW TO RESPOND:
           signal: controller.signal,
         });
         clearTimeout(tid);
+
         if (res.ok) {
           const json = await res.json();
           assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
+          if (assistantText) console.log('✅ Novita OK. Length:', assistantText.length);
         } else {
-          console.log('❌ Novita error:', res.status);
+          console.log('❌ Novita HTTP error:', res.status);
         }
       } catch (e: any) {
         console.log('❌ Novita failed:', e.message);
       }
 
-      // 2. RAG fallback
+      // ── 2. RAG fallback ────────────────────────────────────────────────────
       if (!assistantText && RAG_FALLBACK_URL) {
         try {
-          await new Promise(r => setTimeout(r, 1000));
-          console.log('Falling back to RAG...');
+          await new Promise(r => setTimeout(r, 800));
+          console.log('🔄 Falling back to RAG...');
+
           const ragRes = await fetch(RAG_FALLBACK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ input: question, timestamp: Date.now() }),
           });
+
           if (ragRes.ok) {
-            let j = await ragRes.json().catch(() => ({}));
-            if (Array.isArray(j) && j.length > 0) j = j[0];
-            assistantText = String(
-              j.output || j.response || j.text || j.message ||
-              (j.data && (j.data.output || j.data.text || j.data.response)) ||
-              (typeof j === 'string' ? j : '')
-            ).trim();
-            console.log('✅ RAG responded. Length:', assistantText.length);
+            assistantText = await extractRagResponse(ragRes);
+            console.log('✅ RAG final length:', assistantText.length);
+          } else {
+            console.log('❌ RAG HTTP error:', ragRes.status, ragRes.statusText);
           }
-        } catch (e) { console.error('RAG failed:', e); }
+        } catch (e) {
+          console.error('❌ RAG request threw:', e);
+        }
       }
 
+      // ── 3. Commit or error ─────────────────────────────────────────────────
       if (assistantText) {
         setMessages(prev => [
           ...prev.filter(m => m.id !== optimisticAI.id),
@@ -526,7 +604,6 @@ HOW TO RESPOND:
 
   // ─── Render Message ───────────────────────────────────────────────────────
   const renderMessage = (message: Message, isLast: boolean) => {
-    // Pending / typing state
     if (message.pending && !message.isUser) {
       return (
         <View key={message.id} style={[styles.messageContainer, styles.aiMessage]}>
@@ -535,7 +612,6 @@ HOW TO RESPOND:
       );
     }
 
-    // Strip the hidden JSON block from display text
     const displayText = message.text
       .replace(/```json[\s\S]*?```/g, '')
       .trim() || '...';
@@ -546,8 +622,6 @@ HOW TO RESPOND:
 
     return (
       <View key={message.id} style={[styles.messageContainer, message.isUser ? styles.userMessage : styles.aiMessage]}>
-
-        {/* Chat bubble — text only, no button inside */}
         <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
           {isLast && !message.isUser
             ? <Typewriter text={displayText} />
@@ -560,11 +634,9 @@ HOW TO RESPOND:
           </Text>
         </View>
 
-        {/* "Add to Your Meal Plan" button — appears BELOW bubble, only for AI messages with a plan */}
         {!message.isUser && (
           <AddToMealPlanButton content={message.text} />
         )}
-
       </View>
     );
   };
@@ -594,7 +666,6 @@ HOW TO RESPOND:
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Avatar — replace path with your actual asset */}
         <Animated.View style={[styles.centerHeroContainer, { opacity: fadeAnim }]}>
           <View style={styles.pulseRing}>
             <View style={styles.pulseInner}>
@@ -606,7 +677,6 @@ HOW TO RESPOND:
           </View>
         </Animated.View>
 
-        {/* Voice / chat buttons */}
         <View style={styles.voiceButtonsContainer}>
           <TouchableOpacity
             style={[styles.voiceButton, styles.chatToggleButtonInline, showChat && styles.chatToggleButtonActive]}
@@ -650,7 +720,6 @@ HOW TO RESPOND:
           {currentUserText || currentAgentText || getStateText()}
         </Text>
 
-        {/* Chat panel */}
         {showChat && (
           <>
             <ScrollView
@@ -718,11 +787,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
+  heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
 
   voiceButtonsContainer: {
     flexDirection: 'row',
@@ -732,16 +797,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   voiceButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5,
   },
   chatToggleButtonInline: { backgroundColor: '#E6E1D8', borderWidth: 2, borderColor: '#0090A3' },
   chatToggleButtonActive: { backgroundColor: '#6E006A', borderColor: '#6E006A' },
@@ -791,7 +850,6 @@ const styles = StyleSheet.create({
   userTimestamp: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
   aiTimestamp: { color: '#999' },
 
-  // ── Add to Meal Plan button ──────────────────────────────────────────────
   addPlanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -801,21 +859,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     marginTop: 8,
-    alignSelf: 'flex-start',       // sits left-aligned under AI bubble
+    alignSelf: 'flex-start',
     ...Platform.select({
       ios: { shadowColor: '#0090A3', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
       android: { elevation: 4 },
     }),
   },
-  addPlanBtnAdded: {
-    backgroundColor: '#059669',   // green when done
-  },
-  addPlanBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
+  addPlanBtnAdded: { backgroundColor: '#059669' },
+  addPlanBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
 
   suggestionsContainer: { padding: 16, paddingTop: 0 },
   suggestionsTitle: { fontSize: 15, fontWeight: '600', color: '#0090A3', marginBottom: 10 },
@@ -832,7 +883,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6E1D8',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // paddingBottom: 100,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },

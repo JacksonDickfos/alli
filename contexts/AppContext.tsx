@@ -411,6 +411,7 @@ const AppContext = createContext<{
   createMealPlanFromChat: (days: MealPlanDay[]) => Promise<{ success: boolean; error?: any; mealPlanId?: string }>;
   addMealToPlanDay: (dayOfWeek: number, meal: Omit<MealPlanMeal, 'id'>) => Promise<{ success: boolean; error?: any }>;
   logMealPlanToDiary: (days: MealPlanDay[]) => Promise<{ success: boolean; error?: any }>;
+  deleteMealPlan: () => Promise<{ success: boolean; error?: any }>;
 } | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -1190,6 +1191,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) { return { success: false, error }; }
   };
 
+  const deleteMealPlan = async (): Promise<{ success: boolean; error?: any }> => {
+    try {
+      if (!state.activeMealPlan) return { success: false, error: new Error('No active meal plan') };
+      const { error } = await supabase.from('meal_plans').delete().eq('id', state.activeMealPlan.id);
+      if (error) return { success: false, error };
+      dispatch({ type: 'SET_ACTIVE_MEAL_PLAN', payload: null });
+      return { success: true };
+    } catch (error) { return { success: false, error }; }
+  };
+
   // ─── Preferences / Goals ───────────────────────────────────────────────────
   const setDefaultPreferencesByLocation = (country: string) => {
     const isUSA = country.toUpperCase() === 'US';
@@ -1218,7 +1229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeOnboarding, refreshUser: loadStoredData, clearUser,
       loadActiveMealPlan, createTemplatedMealPlan, updateMealPlanMeal,
       updateMealPlanDay, setActiveMealPlan, createMealPlanFromChat,
-      addMealToPlanDay, logMealPlanToDiary,
+      addMealToPlanDay, logMealPlanToDiary, deleteMealPlan,
     }}>
       {children}
     </AppContext.Provider>
