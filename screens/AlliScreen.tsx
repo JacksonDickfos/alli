@@ -644,7 +644,7 @@ HOW TO RESPOND:
   const renderQuickSuggestions = () => (
     <View style={styles.suggestionsContainer}>
       <Text style={styles.suggestionsTitle}>Quick Questions:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
+      <ScrollView horizontal={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
         {[
           'What should my meal plan be?',
           'How do I lose weight?',
