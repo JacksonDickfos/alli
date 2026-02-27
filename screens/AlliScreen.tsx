@@ -36,11 +36,12 @@ import {
 
 registerGlobals();
 
-const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://62.72.35.123:8003/start_call2';
+const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://tgs-g8ihpbv8.livekit.cloud';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
 const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
 const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
 const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 const RAG_FALLBACK_URL = process.env.EXPO_PUBLIC_RAG_FALLBACK_URL;
 
 interface Message {
@@ -325,16 +326,48 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
     setMessages(prev => [...prev, optimisticUser, optimisticAI]);
 
     try {
-      const systemPrompt = `You are Alli, a friendly and supportive nutrition assistant.
-${MEAL_PLAN_SYSTEM_PROMPT}
+      const systemPrompt = `You are Alli, a highly knowledgeable nutrition specialist assistant with extensive expertise in nutritional science research and clinical studies.
 
-HOW TO RESPOND:
-- Use simple, friendly language — no jargon
-- Be warm and encouraging  
-- Give practical, easy tips
-- Use short paragraphs and bullet points
-- Never diagnose or promise specific results
-`;
+Your expertise:
+- Nutritional science and evidence-based dietary guidelines
+- Macro and micronutrients (vitamins, minerals, proteins, fats, carbohydrates)
+- Food composition, nutritional values, and bioavailability
+- Clinical nutrition research and scientific literature
+- Peer-reviewed journals and research papers in nutrition science
+- Current nutritional guidelines from authoritative sources (WHO, USDA, FDA, European Food Safety Authority)
+- Dietary recommendations for various health goals and medical conditions
+- Nutritional biochemistry and metabolism
+
+Your knowledge base includes:
+- Leading nutrition and medical journals (The American Journal of Clinical Nutrition, Journal of Nutrition, The New England Journal of Medicine, JAMA, Clinical Nutrition, European Journal of Clinical Nutrition)
+- Food composition databases (USDA FoodData Central, FAO Regional Food Composition Tables)
+- Nutrient reference values from multiple countries (US, Canada, Australia, New Zealand, UK, EU)
+- Evidence-based nutritional interventions and their outcomes
+- Recent research findings and systematic reviews in nutrition
+
+Your personality:
+- Professional yet approachable and friendly
+- Patient and empathetic
+- Clear in explaining complex nutritional and scientific concepts
+- Non-judgmental about dietary choices
+- Supportive and encouraging
+- Committed to evidence-based practice
+
+Guidelines:
+- Listen carefully to the user's nutrition-related questions or concerns
+- Provide accurate, evidence-based nutritional information backed by scientific research
+- Reference scientific studies and research findings when relevant
+- Explain nutritional concepts in simple, understandable terms while maintaining scientific accuracy
+- Ask clarifying questions about dietary preferences, allergies, health conditions, or specific goals when relevant
+- Offer practical, actionable nutrition advice grounded in current research
+- Distinguish between well-established scientific consensus and emerging research
+- Always remind users that you're providing general nutrition information based on scientific literature, and they should consult healthcare professionals for personalized medical advice
+- Be respectful of different dietary preferences and cultural food practices
+- Stay current with the latest nutritional research and guidelines
+
+Your goal is to help users make informed decisions about their nutrition and dietary choices through friendly, expert guidance supported by scientific evidence and research.
+
+${MEAL_PLAN_SYSTEM_PROMPT}`;
 
       const messagesToSend = [
         { role: 'system' as const, content: systemPrompt },
@@ -388,27 +421,32 @@ HOW TO RESPOND:
       } catch (e: any) {
         console.log('❌ Novita failed:', e.message);
       }
-
-      // ── 2. RAG fallback ────────────────────────────────────────────────────
-      if (!assistantText && RAG_FALLBACK_URL) {
+      // ── 2. OpenAI Fallback ──────────────────────────────────────────────────
+      if (!assistantText && OPENAI_API_KEY) {
         try {
-          await new Promise(r => setTimeout(r, 800));
-          console.log('🔄 Falling back to RAG...');
-
-          const ragRes = await fetch(RAG_FALLBACK_URL, {
+          console.log('🔄 Falling back to OpenAI...');
+          const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: question, timestamp: Date.now() }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${OPENAI_API_KEY.trim()}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: messagesToSend,
+              temperature: 0.7,
+            }),
           });
 
-          if (ragRes.ok) {
-            assistantText = await extractRagResponse(ragRes);
-            console.log('✅ RAG final length:', assistantText.length);
+          if (openAiRes.ok) {
+            const data = await openAiRes.json();
+            assistantText = data?.choices?.[0]?.message?.content?.trim() || '';
+            console.log('✅ OpenAI responded. Length:', assistantText.length);
           } else {
-            console.log('❌ RAG HTTP error:', ragRes.status, ragRes.statusText);
+            console.log('❌ OpenAI HTTP error:', openAiRes.status);
           }
         } catch (e) {
-          console.error('❌ RAG request threw:', e);
+          console.error('❌ OpenAI request failed:', e);
         }
       }
 
@@ -557,14 +595,19 @@ HOW TO RESPOND:
     }
     setAgentState('connecting'); setConnectionError(null);
     try {
+      console.log('🔄 Fetching LiveKit token from:', BACKEND_URL);
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: '123', roomName: `room-123-${Date.now()}` }),
+        body: JSON.stringify({ agent_id: '123' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data?.data?.token) throw new Error('No token received');
+
+      console.log('✅ Received token. Length:', data.data.token.length);
+      console.log('🔗 Room URL:', data.data.url);
+
       await connectToRoom(data.data.token, data.data.url);
     } catch (err: any) {
       setConnectionError(err.message);
