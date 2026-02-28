@@ -32,7 +32,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const todaysTotals = getTodaysTotals();
   const goals = state.nutritionGoals;
   const user = state.user;
-  const weeklyLogs = (state as any).dailyLogs || [];
+  const weeklyLogs = state.dailyLogs || [];
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -200,14 +200,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     })();
     const hydrationProgress = (() => {
       const current = todaysTotals.hydration || 0;
-      const target = state.userProfile?.weight ? state.userProfile.weight * 30 : 2000; // 30ml per kg
+      const target = user?.weight ? user.weight * 30 : 2000; // 30ml per kg
       return Math.min((current / target) * 100, 100);
     })();
+
 
     return (
       <View style={styles.progressCard}>
         <Text style={[styles.cardTitle, { textAlign: 'center' }]}>Today's Progress</Text>
-        
+
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>
@@ -218,14 +219,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
-            <View 
+            <View
               style={[
-                styles.progressBar, 
-                { 
-                  width: `${Math.min(calorieProgress, 100)}%`, 
-                     backgroundColor: getProgressColor(calorieProgress, 'calories')
+                styles.progressBar,
+                {
+                  width: `${Math.min(calorieProgress, 100)}%`,
+                  backgroundColor: getProgressColor(calorieProgress, 'calories')
                 }
-              ]} 
+              ]}
             />
           </View>
         </View>
@@ -238,14 +239,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
-            <View 
+            <View
               style={[
-                styles.progressBar, 
-                { 
-                  width: `${Math.min(proteinProgress, 100)}%`, 
-                     backgroundColor: getProgressColor(proteinProgress, 'protein')
+                styles.progressBar,
+                {
+                  width: `${Math.min(proteinProgress, 100)}%`,
+                  backgroundColor: getProgressColor(proteinProgress, 'protein')
                 }
-              ]} 
+              ]}
             />
           </View>
         </View>
@@ -277,7 +278,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const renderQuickActions = () => (
     <View style={styles.quickActionsContainer}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionCard, { width: (width - 60) / 2 }]}
           onPress={goToDiaryAndOpenCamera}
         >
@@ -287,7 +288,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionCard, { width: (width - 60) / 2 }]}
           onPress={goToPlan}
         >
@@ -303,7 +304,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   // Compliance, Sleep, Stress tiles
   const renderComplianceTiles = () => {
     // Diary completion score: count meals logged today / 3
-    const mealsToday = currentLog ? new Set(currentLog.foods.map(f=>f.mealType)).size : 0;
+    const mealsToday = currentLog ? new Set(currentLog.foods.map(f => f.mealType)).size : 0;
     const diaryScore = Math.min(1, mealsToday / 3);
     // Macro adherence: average of closeness to goals (if goals exist)
     let adherence = 0;
@@ -314,12 +315,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         goals.carbs ? Math.min(1, (todaysTotals.carbs / goals.carbs)) : 0,
         goals.fat ? Math.min(1, (todaysTotals.fat / goals.fat)) : 0,
       ];
-      adherence = ratios.reduce((a,b)=>a+b,0) / ratios.length;
+      adherence = ratios.reduce((a, b) => a + b, 0) / ratios.length;
     }
     const compliance = Math.round(((diaryScore + adherence) / 2) * 100);
     const complianceColor = compliance >= 100 ? '#2ECC71' : compliance >= 80 ? '#1ABC9C' : compliance >= 50 ? '#FF9800' : '#FF3B30';
 
-    const Tile = ({ icon, label, value, onPress } : any) => (
+    const Tile = ({ icon, label, value, onPress }: any) => (
       <TouchableOpacity style={styles.tile} onPress={onPress}>
         <MaterialCommunityIcons name={icon} size={22} color="#B9A68D" />
         <Text style={styles.tileLabel}>{label}</Text>
@@ -411,25 +412,154 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           <Text style={styles.motivationBubbleText}>{messageOfTheDay}</Text>
         </View>
 
-        {/* Upcoming Meal (fallback to generate) */}
-        <View style={styles.cardBlock}>
-          <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>Upcoming Meal</Text>
-          <View style={styles.upcomingMealRow}>
-            <Image source={require('../assets/meal2.png')} style={styles.upcomingMealHeroImage} />
-            <View style={styles.upcomingMealButtonOverlay} pointerEvents="box-none">
-              <TouchableOpacity onPress={goToPlan} activeOpacity={0.85}>
-                <LinearGradient
-                  colors={['#0090A3', '#6E006A', '#4F0232']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.consultButton, styles.upcomingMealButtonGradient]}
+        {/* Upcoming Meal Section */}
+        {(() => {
+          const activePlan = state.activeMealPlan;
+          if (!activePlan) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>Upcoming Meal</Text>
+                <View style={styles.upcomingMealRow}>
+                  <Image source={require('../assets/meal2.png')} style={styles.upcomingMealHeroImage} />
+                  <View style={styles.upcomingMealButtonOverlay} pointerEvents="box-none">
+                    <TouchableOpacity onPress={goToPlan} activeOpacity={0.85}>
+                      <LinearGradient
+                        colors={['#0090A3', '#6E006A', '#4F0232']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.consultButton, styles.upcomingMealButtonGradient]}
+                      >
+                        <Text style={styles.consultText}>Generate Meal Plan</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          }
+
+          // Find current day's plan
+          const todayIdx = (new Date().getDay() + 6) % 7; // Monday=0
+          const todayPlan = activePlan.days.find(d => d.dayOfWeek === todayIdx);
+
+          if (!todayPlan || !Array.isArray(todayPlan.meals) || todayPlan.meals.length === 0) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+                  Upcoming Meal
+                </Text>
+                <Text style={{ textAlign: 'center', color: '#666' }}>
+                  No meals planned for today.
+                </Text>
+              </View>
+            );
+          }
+
+          if (!todayPlan) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>Upcoming Meal</Text>
+                <View style={styles.upcomingMealRow}>
+                  <Image source={require('../assets/meal2.png')} style={styles.upcomingMealHeroImage} />
+                  <View style={styles.upcomingMealButtonOverlay} pointerEvents="box-none">
+                    <TouchableOpacity onPress={goToPlan} activeOpacity={0.85}>
+                      <LinearGradient
+                        colors={['#0090A3', '#6E006A', '#4F0232']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.consultButton, styles.upcomingMealButtonGradient]}
+                      >
+                        <Text style={styles.consultText}>View Meal Plan</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          }
+
+          // Find next meal
+          const currentHour = new Date().getHours();
+          const safeMeals = todayPlan.meals.filter(Boolean);
+
+          let nextMeal = safeMeals.find(m => {
+            if (m.mealType === 'breakfast' && currentHour < 10) return true;
+            if (m.mealType === 'snack' && m.mealOrder === 1 && currentHour < 12) return true;
+            if (m.mealType === 'lunch' && currentHour < 15) return true;
+            if (m.mealType === 'snack' && m.mealOrder === 3 && currentHour < 17) return true;
+            if (m.mealType === 'dinner' && currentHour < 22) return true;
+            return false;
+          });
+
+          if (!nextMeal && safeMeals.length > 0) {
+            nextMeal = safeMeals[safeMeals.length - 1];
+          }
+
+          if (!nextMeal) {
+            return (
+              <View style={styles.cardBlock}>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+                  Upcoming Meal
+                </Text>
+                <Text style={{ textAlign: 'center', color: '#666' }}>
+                  No meals scheduled.
+                </Text>
+              </View>
+            );
+          }
+
+          return (
+            <View style={styles.cardBlock}>
+              <View style={styles.upcomingHeader}>
+                <Text style={styles.sectionTitle}>Upcoming: {nextMeal.mealType.charAt(0).toUpperCase() + nextMeal.mealType.slice(1)}</Text>
+                <TouchableOpacity onPress={goToPlan}>
+                  <Text style={styles.seeAllText}>Full Plan</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.plannedMealCard}>
+                <View style={styles.plannedMealInfo}>
+                  <Text style={styles.plannedMealTitle}>{nextMeal.title}</Text>
+                  {nextMeal.description ? <Text style={styles.plannedMealDesc}>{nextMeal.description}</Text> : null}
+                  <View style={styles.plannedMealMacros}>
+                    {nextMeal.calories ? <Text style={styles.plannedMacroText}>{nextMeal.calories} cal</Text> : null}
+                    {nextMeal.protein ? <Text style={styles.plannedMacroText}>{nextMeal.protein}g Protein</Text> : null}
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.logPlannedBtn}
+                  onPress={async () => {
+                    const food = {
+                      name: nextMeal!.title,
+                      mealType: nextMeal!.mealType as any,
+                      calories: nextMeal!.calories || 0,
+                      protein: nextMeal!.protein || 0,
+                      carbs: nextMeal!.carbs || 0,
+                      fat: nextMeal!.fat || 0,
+                      fiber: 0,
+                      sugar: 0,
+                      servingSize: '1 serving',
+                      confidence: 1.0,
+                    };
+                    const res = await (state as any).addFoodItem(food);
+                    if (res.success) {
+                      Alert.alert('Success', `${nextMeal!.title} added to your diary!`);
+                    } else {
+                      Alert.alert('Error', 'Failed to add meal.');
+                    }
+                  }}
                 >
-                  <Text style={styles.consultText}>Generate Meal Plan</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient colors={['#0090A3', '#28657A']} style={styles.logPlannedGradient}>
+                    <Ionicons name="add" size={24} color="#fff" />
+                    <Text style={styles.logPlannedText}>Log</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          );
+        })()}
+
 
         {/* Progress Card + Weekly swipe */}
         {renderProgressCard()}
@@ -577,7 +707,65 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 4,
   },
+  upcomingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  plannedMealCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 },
+      android: { elevation: 2 },
+    }),
+  },
+  plannedMealInfo: {
+    flex: 1,
+  },
+  plannedMealTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2A2A2A',
+  },
+  plannedMealDesc: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  plannedMealMacros: {
+    flexDirection: 'row',
+    marginTop: 6,
+    gap: 8,
+  },
+  plannedMacroText: {
+    fontSize: 12,
+    color: '#0090A3',
+    fontWeight: '600',
+  },
+  logPlannedBtn: {
+    marginLeft: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  logPlannedGradient: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  logPlannedText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   motivationText: {
+
     fontSize: 16,
     color: '#2A2A2A',
     marginLeft: 12,

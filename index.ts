@@ -1,4 +1,7 @@
 import { registerRootComponent } from 'expo';
+import { registerGlobals } from '@livekit/react-native';
+
+registerGlobals();
 
 import App from './App';
 

@@ -17,9 +17,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
-// Import core LiveKit classes from livekit-client
+import { parseMealPlanFromMessage, MEAL_PLAN_SYSTEM_PROMPT } from '../lib/mealPlanUtils';
+import { ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   Room,
   RoomEvent,
@@ -27,7 +28,6 @@ import {
   RemoteAudioTrack,
   createLocalAudioTrack,
 } from 'livekit-client';
-// Import React Native-specific features from @livekit/react-native
 import {
   AudioSession,
   registerGlobals,
@@ -36,7 +36,6 @@ import {
 
 registerGlobals();
 
-// Configuration
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://62.72.35.123:8003/start_call2';
 const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
@@ -53,15 +52,15 @@ interface Message {
   pending?: boolean;
 }
 
-// Typing indicator dots animation
+// ─── Typing Indicator ────────────────────────────────────────────────────────
 function TypingIndicator() {
-  const dot1 = React.useRef(new Animated.Value(0)).current;
-  const dot2 = React.useRef(new Animated.Value(0)).current;
-  const dot3 = React.useRef(new Animated.Value(0)).current;
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
 
-  React.useEffect(() => {
-    const animate = (dot: Animated.Value, delay: number) => {
-      return Animated.loop(
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
           Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -69,19 +68,12 @@ function TypingIndicator() {
           Animated.delay(600 - delay),
         ])
       );
-    };
     const a1 = animate(dot1, 0);
     const a2 = animate(dot2, 200);
     const a3 = animate(dot3, 400);
-    a1.start();
-    a2.start();
-    a3.start();
-    return () => {
-      a1.stop();
-      a2.stop();
-      a3.stop();
-    };
-  }, [dot1, dot2, dot3]);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, []);
 
   const dotStyle = (anim: Animated.Value) => ({
     opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
@@ -97,42 +89,167 @@ function TypingIndicator() {
   );
 }
 
-const Typewriter = ({ text }: { text: string }) => {
+// ─── Typewriter ──────────────────────────────────────────────────────────────
+function Typewriter({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('');
-
   useEffect(() => {
     setDisplayed('');
     let i = 0;
     const timer = setInterval(() => {
-      if (i < text.length) {
-        setDisplayed(prev => prev + text.charAt(i));
-        i++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 15); // Adjust speed here
+      if (i < text.length) { setDisplayed(prev => prev + text.charAt(i)); i++; }
+      else clearInterval(timer);
+    }, 15);
     return () => clearInterval(timer);
   }, [text]);
-
-  return <Text style={styles.aiMessageText}>{displayed}</Text>;
-};
-
-interface AlliScreenProps {
-  navigation: any;
+  return <Text style={[styles.messageText, styles.aiMessageText]}>{displayed}</Text>;
 }
 
+// ─── Add to Meal Plan Button ─────────────────────────────────────────────────
+function AddToMealPlanButton({ content }: { content: string }) {
+  const { createMealPlanFromChat } = useApp();
+  const navigation = useNavigation<any>();
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  const mealPlan = React.useMemo(() => parseMealPlanFromMessage(content), [content]);
+  if (!mealPlan || mealPlan.length === 0) return null;
+
+  const handlePress = async () => {
+    if (added || adding) return;
+    setAdding(true);
+    try {
+      const result = await createMealPlanFromChat(mealPlan);
+      if (result.success) {
+        setAdded(true);
+        Alert.alert(
+          '✅ Meal Plan Added!',
+          `${mealPlan.length} day${mealPlan.length > 1 ? 's' : ''} added to your Meal Plan.`,
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'View Plan', onPress: () => navigation.navigate('Plan') },
+          ]
+        );
+      } else {
+        Alert.alert('Error', (result as any).error?.message || 'Failed to add meal plan.');
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.addPlanBtn, added && styles.addPlanBtnAdded]}
+      onPress={handlePress}
+      disabled={adding || added}
+      activeOpacity={0.85}
+    >
+      {adding ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <>
+          <Ionicons
+            name={added ? 'checkmark-circle' : 'calendar-outline'}
+            size={18}
+            color="#fff"
+            style={{ marginRight: 6 }}
+          />
+          <Text style={styles.addPlanBtnText}>
+            {added ? 'Added to Meal Plan ✓' : 'Add to Your Meal Plan'}
+          </Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── RAG response extractor ───────────────────────────────────────────────────
+// THE FIX: reads body as raw text first (never silently fails like .json() does),
+// then intelligently parses JSON and checks every known field name.
+async function extractRagResponse(ragRes: Response): Promise<string> {
+  // Step 1 — always read as text. This never throws unlike .json()
+  const rawText = await ragRes.text();
+  console.log('🔍 RAG raw body (first 400):', rawText.slice(0, 400));
+
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+
+  // Step 2 — if not JSON-shaped, return as plain text directly
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    console.log('✅ RAG plain text response');
+    return trimmed;
+  }
+
+  // Step 3 — parse JSON
+  let j: any;
+  try {
+    j = JSON.parse(trimmed);
+  } catch {
+    console.warn('⚠️ RAG looked like JSON but failed to parse — returning raw');
+    return trimmed;
+  }
+
+  // Step 4 — unwrap array e.g. [{ ... }]
+  if (Array.isArray(j) && j.length > 0) j = j[0];
+
+  console.log('🔍 RAG parsed keys:', Object.keys(j ?? {}));
+
+  // Step 5 — already a bare string
+  if (typeof j === 'string') return j.trim();
+
+  // Step 6 — check every field name across all known RAG/LLM API shapes
+  const candidates: Array<string | undefined> = [
+    j?.output,
+    j?.response,
+    j?.text,
+    j?.message,
+    j?.answer,
+    j?.result,
+    j?.content,
+    j?.reply,
+    j?.generated_text,
+    j?.completion,
+    j?.bot,
+    j?.assistant,
+    // OpenAI-compatible
+    j?.choices?.[0]?.message?.content,
+    j?.choices?.[0]?.text,
+    // nested under data
+    j?.data?.output,
+    j?.data?.response,
+    j?.data?.text,
+    j?.data?.message,
+    j?.data?.answer,
+    j?.data?.result,
+    j?.data?.content,
+    j?.data?.reply,
+  ];
+
+  for (const c of candidates) {
+    if (c && typeof c === 'string' && c.trim().length > 0) {
+      return c.trim();
+    }
+  }
+
+  // Step 7 — nothing matched; log the full object so the correct key is visible
+  console.warn('⚠️ RAG: no known field matched. Full object:', JSON.stringify(j));
+  return '';
+}
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
+interface AlliScreenProps { navigation: any; }
 type AgentState = 'connecting' | 'initializing' | 'listening' | 'speaking' | 'thinking';
 
 export default function AlliScreen({ navigation }: AlliScreenProps) {
   const { state, getTodaysTotals } = useApp();
 
-  // Chat state
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
-  // Voice state
   const [room, setRoom] = useState<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -143,38 +260,28 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
   const [currentAgentText, setCurrentAgentText] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Refs
   const scrollViewRef = useRef<ScrollView>(null);
   const audioLevelSmoothRef = useRef(0);
   const lastSpeakingTime = useRef(Date.now());
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const todaysTotals = getTodaysTotals();
-  const goals = state.nutritionGoals;
-
-  // Fade-in only (no pulse)
   useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 800,
+      toValue: 1, duration: 800,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, []);
 
-  // Auto-scroll messages
   useEffect(() => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages, currentUserText, currentAgentText]);
 
-  // Audio level decay
   useEffect(() => {
-    const decayInterval = setInterval(() => {
-      const timeSinceLastSpeak = Date.now() - lastSpeakingTime.current;
-      if (timeSinceLastSpeak > 200 && audioLevelSmoothRef.current > 0.01) {
+    const interval = setInterval(() => {
+      const timeSince = Date.now() - lastSpeakingTime.current;
+      if (timeSince > 200 && audioLevelSmoothRef.current > 0.01) {
         audioLevelSmoothRef.current *= 0.85;
         setAudioLevel(audioLevelSmoothRef.current);
         if (audioLevelSmoothRef.current < 0.01) {
@@ -183,194 +290,160 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
         }
       }
     }, 50);
-    return () => clearInterval(decayInterval);
+    return () => clearInterval(interval);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (connectionTimeoutRef.current) {
-        clearTimeout(connectionTimeoutRef.current);
-      }
-      if (room) {
-        room.disconnect();
-      }
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (room) room.disconnect();
     };
   }, [room]);
 
-  const updateAudioLevel = (level: number) => {
-    const smoothingFactor = 0.3;
-    audioLevelSmoothRef.current =
-      audioLevelSmoothRef.current * (1 - smoothingFactor) + level * smoothingFactor;
-    setAudioLevel(audioLevelSmoothRef.current);
-    if (level > 0.01) {
-      lastSpeakingTime.current = Date.now();
-    }
-  };
-
-  // ===== CHAT FUNCTIONS =====
+  // ─── Chat ─────────────────────────────────────────────────────────────────
   const sendMessage = async () => {
     if (!inputText.trim()) return;
-
     const question = inputText.trim();
     setInputText('');
     setIsProcessing(true);
 
     const optimisticUser: Message = {
-      id: `local-user-${Date.now()}`,
+      id: `u-${Date.now()}`,
       text: question,
       isUser: true,
       timestamp: new Date(),
       type: 'text',
     };
-
     const optimisticAI: Message = {
-      id: `local-ai-${Date.now() + 1}`, // Ensure unique ID
+      id: `a-${Date.now() + 1}`,
       text: '...',
       isUser: false,
       timestamp: new Date(),
       type: 'text',
       pending: true,
     };
-
     setMessages(prev => [...prev, optimisticUser, optimisticAI]);
 
     try {
-      const systemPrompt = 
-`You are Alli, a friendly and supportive nutrition assistant. Your goal is to help people eat better and feel healthier.
+      const systemPrompt = `You are Alli, a friendly and supportive nutrition assistant.
+${MEAL_PLAN_SYSTEM_PROMPT}
 
-IMPORTANT RULES FOR HOW YOU RESPOND:
+HOW TO RESPOND:
+- Use simple, friendly language — no jargon
+- Be warm and encouraging  
+- Give practical, easy tips
+- Use short paragraphs and bullet points
+- Never diagnose or promise specific results
+`;
 
-1. USE SIMPLE LANGUAGE
-   - Explain everything like you're talking to a friend who knows nothing about nutrition
-   - Avoid scientific words, medical terms, and jargon
-   - If you must use a technical term, explain it simply in parentheses
-   - Example: Say "good fats" instead of "unsaturated fatty acids"
-   - Example: Say "helps your body fight sickness" instead of "boosts immune function"
-
-2. BE WARM AND ENCOURAGING
-   - Use a friendly, conversational tone
-   - Celebrate small wins and progress
-   - Never shame or judge food choices
-   - Be supportive, not preachy
-
-3. GIVE PRACTICAL ADVICE
-   - Focus on easy, actionable tips people can actually do
-   - Suggest simple food swaps, not complete diet overhauls
-   - Consider that people are busy and may not cook elaborate meals
-   - Give specific examples and portion sizes in everyday terms (like "a handful" or "about the size of your fist")
-
-4. FORMAT FOR EASY READING
-   - Use short paragraphs
-   - Use bullet points for lists
-   - Bold important points
-   - Break up long explanations into digestible chunks
-
-5. BE HONEST AND SAFE
-   - Don't diagnose medical conditions
-   - Recommend seeing a doctor for health concerns
-   - Acknowledge when something is debated or uncertain
-   - Don't promise specific results
-
-Remember: Your user might be confused, overwhelmed, or just starting their health journey. Make nutrition feel approachable and doable, not complicated or scary.`;
-
-      
-      // Filter out pending messages when sending to API
       const messagesToSend = [
         { role: 'system' as const, content: systemPrompt },
-        ...messages.filter(m => !m.pending).map(m => ({ role: m.isUser ? 'user' as const : 'assistant' as const, content: m.text })),
-        { role: 'user' as const, content: question }
+        ...messages
+          .filter(m => !m.pending)
+          .map(m => ({
+            role: m.isUser ? 'user' as const : 'assistant' as const,
+            content: m.isUser ? m.text : m.text.replace(/```json[\s\S]*?```/g, '').trim(),
+          })),
+        { role: 'user' as const, content: question },
       ];
 
       let assistantText = '';
-      let novitaError = '';
 
-      // 1. Try Novita API
+      // ── 1. Novita ──────────────────────────────────────────────────────────
       try {
+        const controller = new AbortController();
+        const isMealPlan =
+          question.toLowerCase().includes('plan') ||
+          question.toLowerCase().includes('diet');
+        const tid = setTimeout(() => {
+          console.log('⏰ Novita timeout');
+          controller.abort();
+        }, isMealPlan ? 45_000 : 20_000);
+
         const res = await fetch(NOVITA_API_URL as string, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${NOVITA_API_KEY}`,
+            Authorization: `Bearer ${NOVITA_API_KEY?.trim()}`,
           },
           body: JSON.stringify({
             model: NOVITA_MODEL,
             messages: messagesToSend,
             temperature: 0.3,
-            max_tokens: 800,
-            reasoning: { enabled: false }
+            max_tokens: 1500,
+            reasoning: { enabled: false },
           }),
+          signal: controller.signal,
         });
+        clearTimeout(tid);
 
         if (res.ok) {
           const json = await res.json();
           assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
+          if (assistantText) console.log('✅ Novita OK. Length:', assistantText.length);
         } else {
-          novitaError = `Status ${res.status}`;
-          console.log(`Novita failed with ${res.status}, trying fallback...`);
+          console.log('❌ Novita HTTP error:', res.status);
         }
       } catch (e: any) {
-        novitaError = e.message;
-        console.log(`Novita execution failed: ${e.message}, trying fallback...`);
+        console.log('❌ Novita failed:', e.message);
       }
 
-      // 2. Fallback to RAG if needed
+      // ── 2. RAG fallback ────────────────────────────────────────────────────
       if (!assistantText && RAG_FALLBACK_URL) {
         try {
-          console.log('Falling back to RAG endpoint...');
+          await new Promise(r => setTimeout(r, 800));
+          console.log('🔄 Falling back to RAG...');
+
           const ragRes = await fetch(RAG_FALLBACK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: question }),
+            body: JSON.stringify({ input: question, timestamp: Date.now() }),
           });
 
           if (ragRes.ok) {
-            const ragJson = await ragRes.json().catch(() => ({}));
-            assistantText = String(ragJson.output || ragJson.response || ragJson.text || ragJson.message || (typeof ragJson === 'string' ? ragJson : '')).trim();
+            assistantText = await extractRagResponse(ragRes);
+            console.log('✅ RAG final length:', assistantText.length);
+          } else {
+            console.log('❌ RAG HTTP error:', ragRes.status, ragRes.statusText);
           }
-        } catch (ragErr) {
-          console.error('RAG Fallback failed:', ragErr);
+        } catch (e) {
+          console.error('❌ RAG request threw:', e);
         }
       }
 
+      // ── 3. Commit or error ─────────────────────────────────────────────────
       if (assistantText) {
-        const aiMessage: Message = {
-          id: String(Date.now() + 1),
-          text: assistantText,
-          isUser: false,
-          timestamp: new Date(),
-          type: 'text',
-        };
-        // Replace optimistic AI message with real one
-        setMessages(prev => {
-          const filtered = prev.filter(m => m.id !== optimisticAI.id);
-          return [...filtered, aiMessage];
-        });
+        setMessages(prev => [
+          ...prev.filter(m => m.id !== optimisticAI.id),
+          {
+            id: String(Date.now() + 1),
+            text: assistantText,
+            isUser: false,
+            timestamp: new Date(),
+            type: 'text',
+          },
+        ]);
       } else {
-        throw new Error('All assistants failed to respond. Please try again later.');
+        throw new Error('No response received. Please try again.');
       }
     } catch (error: any) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', `Failed to get response: ${error.message}`);
-      // Remove optimistic pending message on error
+      Alert.alert('Error', error.message);
       setMessages(prev => prev.filter(m => m.id !== optimisticAI.id));
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const sendQuickMessage = (message: string) => {
-    setInputText(message);
+  const sendQuickMessage = (msg: string) => {
+    setInputText(msg);
     setTimeout(() => sendMessage(), 100);
   };
 
-  // ===== VOICE FUNCTIONS =====
+  // ─── Voice ────────────────────────────────────────────────────────────────
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
-      );
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
       return granted === PermissionsAndroid.RESULTS.GRANTED;
     }
     return true;
@@ -379,300 +452,157 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
   const setupAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
-        android: {
-          preferredOutputList: ['speaker'],
-          audioTypeOptions: AndroidAudioTypePresets.Communication,
-        },
-        ios: {
-          defaultOutput: 'speaker',
-        },
+        android: { preferredOutputList: ['speaker'], audioTypeOptions: AndroidAudioTypePresets.communication },
+        ios: { defaultOutput: 'speaker' },
       });
       await AudioSession.startAudioSession();
-    } catch (err) {
-      console.error('❌ Error configuring AudioSession:', err);
-    }
+    } catch (e) { console.error('AudioSession error:', e); }
   };
 
   const stopAudioSession = async () => {
-    try {
-      await AudioSession.stopAudioSession();
-    } catch (err) {
-      console.error('❌ Error stopping AudioSession:', err);
-    }
+    try { await AudioSession.stopAudioSession(); } catch { }
   };
 
-  const connectToRoom = async (token: string) => {
+  const connectToRoom = async (token: string, serverUrl?: string) => {
     try {
       setAgentState('connecting');
       setConnectionError(null);
       await setupAudioSession();
 
       connectionTimeoutRef.current = setTimeout(() => {
-        setConnectionError('Connection timeout - please check your network and try again');
+        setConnectionError('Connection timeout');
         setAgentState('listening');
         handleDisconnect();
       }, 15000);
 
-      const r = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
+      const r = new Room({ adaptiveStream: true, dynacast: true });
 
-      r.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        if (track.kind === 'audio') {
-          const audioTrack = track as RemoteAudioTrack;
-          audioTrack.setVolume(1.0);
-          // TODO: audioLevelChanged is deprecated. Use createAudioAnalyser instead.
-          /*
-          audioTrack.on('audioLevelChanged', (level: number) => {
-            if (level > 0.005) {
-              setAgentState('speaking');
-              const scaledLevel = Math.min(1, Math.pow(level * 8, 0.8));
-              updateAudioLevel(Math.min(1, scaledLevel));
-            } else {
-              if (Date.now() - lastSpeakingTime.current > 250) {
-                setAgentState('listening');
-              }
-            }
-          });
-          */
-        }
+      r.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === 'audio') (track as RemoteAudioTrack).setVolume(1.0);
       });
 
       r.on(RoomEvent.TranscriptionReceived, (transcriptions, participant) => {
-        transcriptions.forEach((transcription) => {
+        transcriptions.forEach(t => {
           const isAgent = participant?.identity !== r.localParticipant.identity;
-          const text = transcription.text;
-
           if (isAgent) {
-            setCurrentAgentText(text);
-            if (transcription.final) {
-              const aiMessage: Message = {
-                id: String(Date.now() + 1),
-                text,
-                isUser: false,
-                timestamp: new Date(),
-                type: 'text',
-              };
-              setMessages(prev => [...prev, aiMessage]);
+            setCurrentAgentText(t.text);
+            if (t.final) {
+              setMessages(prev => [...prev, {
+                id: String(Date.now() + 1), text: t.text,
+                isUser: false, timestamp: new Date(), type: 'text',
+              }]);
               setCurrentAgentText('');
             }
           } else {
-            setCurrentUserText(text);
-            if (transcription.final) {
-              const userMessage: Message = {
-                id: Date.now().toString(),
-                text,
-                isUser: true,
-                timestamp: new Date(),
-                type: 'text',
-              };
-              setMessages(prev => [...prev, userMessage]);
+            setCurrentUserText(t.text);
+            if (t.final) {
+              setMessages(prev => [...prev, {
+                id: Date.now().toString(), text: t.text,
+                isUser: true, timestamp: new Date(), type: 'text',
+              }]);
               setCurrentUserText('');
             }
           }
         });
       });
 
-      r.on(RoomEvent.LocalTrackPublished, (trackPub) => {
-        const track = trackPub.track;
-        if (track && track.kind === 'audio') {
-          // TODO: audioLevelChanged is deprecated. Use createAudioAnalyser instead.
-          /*
-          track.on('audioLevelChanged', (level: number) => {
-            if (level > 0.005) {
-              setAgentState('thinking');
-              const scaledLevel = Math.pow(level * 12, 0.7);
-              updateAudioLevel(Math.min(1, scaledLevel));
-            } else {
-              if (agentState === 'thinking') {
-                setAgentState('listening');
-              }
-            }
-          });
-          */
-        }
+      r.on(RoomEvent.DataReceived, (payload) => {
+        try {
+          const data = JSON.parse(new TextDecoder().decode(payload));
+          if (data.type === 'meal_plan' || data.days) {
+            setMessages(prev => [...prev, {
+              id: `data-${Date.now()}`,
+              text: `Here is your meal plan!\n\n\`\`\`json\n${JSON.stringify(data)}\n\`\`\``,
+              isUser: false, timestamp: new Date(), type: 'text',
+            }]);
+          }
+        } catch { }
       });
 
       r.on(RoomEvent.Connected, () => {
-        console.log('✅ Connected to LiveKit room');
-        if (connectionTimeoutRef.current) {
-          clearTimeout(connectionTimeoutRef.current);
-        }
-        setConnected(true);
-        setAgentState('initializing');
-        setConnectionError(null);
-        setTimeout(() => {
-          setAgentState('listening');
-          setAudioLevel(0);
-        }, 1000);
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        setConnected(true); setAgentState('initializing'); setConnectionError(null);
+        setTimeout(() => { setAgentState('listening'); setAudioLevel(0); }, 1000);
       });
 
       r.on(RoomEvent.Disconnected, (reason) => {
-        console.log('❌ Disconnected from LiveKit room:', reason);
-        if (connectionTimeoutRef.current) {
-          clearTimeout(connectionTimeoutRef.current);
-        }
-        setConnected(false);
-        setAgentState('listening');
-        setAudioLevel(0);
-        audioLevelSmoothRef.current = 0;
-        if (reason) {
-          setConnectionError(`Disconnected: ${reason}`);
-        }
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        setConnected(false); setAgentState('listening');
+        setAudioLevel(0); audioLevelSmoothRef.current = 0;
+        if (reason) setConnectionError(`Disconnected: ${reason}`);
       });
 
-      r.on(RoomEvent.ConnectionStateChanged, (state) => {
-        console.log('🔌 Connection state:', state);
-      });
+      r.on(RoomEvent.ConnectionStateChanged, (s) => console.log('🔌 Connection state:', s));
 
-      setAgentState('initializing');
       const track = await createLocalAudioTrack({
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+        echoCancellation: true, noiseSuppression: true, autoGainControl: true,
       });
       setLocalTrack(track);
-
-      await r.connect(LIVEKIT_URL, token);
+      await r.connect(serverUrl || LIVEKIT_URL, token);
       await r.localParticipant.publishTrack(track);
-
       setRoom(r);
     } catch (err: any) {
-      console.error('❌ LiveKit connection error:', err);
-      if (connectionTimeoutRef.current) {
-        clearTimeout(connectionTimeoutRef.current);
-      }
-
-      let errorMessage = 'Connection failed';
-      if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setConnectionError(errorMessage);
-      Alert.alert('Connection Error', errorMessage);
-      setAgentState('listening');
-      setAudioLevel(0);
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      setConnectionError(err.message);
+      Alert.alert('Connection Error', err.message);
+      setAgentState('listening'); setAudioLevel(0);
       await stopAudioSession();
     }
   };
 
   const handleConnect = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) {
+    if (!await requestPermissions()) {
       Alert.alert('Permission Required', 'Microphone permission is required for voice chat');
       return;
     }
-
-    setAgentState('connecting');
-    setConnectionError(null);
-
+    setAgentState('connecting'); setConnectionError(null);
     try {
-      const requestBody = {
-        agent_id: '123',
-        roomName: `room-123-${Date.now()}`,
-      };
-
-      console.log('🔌 Connecting to backend:', BACKEND_URL);
-      const response = await fetch(BACKEND_URL, {
+      const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ agent_id: '123', roomName: `room-123-${Date.now()}` }),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (!data?.data?.token) {
-        throw new Error('No token received from backend');
-      }
-
-      await connectToRoom(data.data.token);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data?.data?.token) throw new Error('No token received');
+      await connectToRoom(data.data.token, data.data.url);
     } catch (err: any) {
-      console.error('❌ Error getting token:', err);
-
-      let errorMessage = 'Failed to connect to voice service';
-      if (err.message.includes('Network request failed')) {
-        errorMessage = 'Network error - please check your internet connection';
-      } else if (err.message.includes('timeout')) {
-        errorMessage = 'Connection timeout - please try again';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setConnectionError(errorMessage);
-      Alert.alert('Connection Error', errorMessage);
-      setAgentState('listening');
-      setAudioLevel(0);
+      setConnectionError(err.message);
+      Alert.alert('Connection Error', err.message);
+      setAgentState('listening'); setAudioLevel(0);
     }
   };
 
   const handleDisconnect = async () => {
-    if (connectionTimeoutRef.current) {
-      clearTimeout(connectionTimeoutRef.current);
-    }
-
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
     if (room) {
-      if (localTrack) {
-        localTrack.stop();
-        setLocalTrack(null);
-      }
-      room.disconnect();
-      setRoom(null);
+      if (localTrack) { localTrack.stop(); setLocalTrack(null); }
+      room.disconnect(); setRoom(null);
     }
-
-    setConnected(false);
-    setAgentState('listening');
-    setAudioLevel(0);
-    audioLevelSmoothRef.current = 0;
+    setConnected(false); setAgentState('listening');
+    setAudioLevel(0); audioLevelSmoothRef.current = 0;
     await stopAudioSession();
   };
 
   const handleMuteToggle = async () => {
     if (localTrack) {
-      if (muted) {
-        await localTrack.unmute();
-      } else {
-        await localTrack.mute();
-      }
+      muted ? await localTrack.unmute() : await localTrack.mute();
       setMuted(!muted);
     }
   };
 
   const getStateText = () => {
     switch (agentState) {
-      case 'connecting':
-        return 'Connecting...';
-      case 'initializing':
-        return 'Initializing...';
-      case 'listening':
-        return 'Listening...';
-      case 'thinking':
-        return 'Processing...';
-      case 'speaking':
-        return 'Alli is speaking...';
-      default:
-        return '';
+      case 'connecting': return 'Connecting...';
+      case 'initializing': return 'Initializing...';
+      case 'listening': return 'Listening...';
+      case 'thinking': return 'Processing...';
+      case 'speaking': return 'Alli is speaking...';
+      default: return '';
     }
   };
 
-  const getOrbColor = () => {
-    switch (agentState) {
-      case 'speaking':
-        return '#E97451';
-      case 'thinking':
-        return '#9B87F5';
-      case 'connecting':
-      case 'initializing':
-        return '#94A3B8';
-      default:
-        return '#B9A68D';
-    }
-  };
-
-  // ===== RENDER FUNCTIONS =====
+  // ─── Render Message ───────────────────────────────────────────────────────
   const renderMessage = (message: Message, isLast: boolean) => {
     if (message.pending && !message.isUser) {
       return (
@@ -681,303 +611,165 @@ Remember: Your user might be confused, overwhelmed, or just starting their healt
         </View>
       );
     }
+
+    const displayText = message.text
+      .replace(/```json[\s\S]*?```/g, '')
+      .trim() || '...';
+
+    const timeStr = message.timestamp instanceof Date
+      ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : 'Recently';
+
     return (
-      <View
-        key={message.id}
-        style={[
-          styles.messageContainer,
-          message.isUser ? styles.userMessage : styles.aiMessage,
-        ]}
-      >
-        <View
-          style={[
-            styles.messageBubble,
-            message.isUser ? styles.userBubble : styles.aiBubble,
-          ]}
-        >
-          {isLast && !message.isUser ? (
-            <Typewriter text={message.text} />
-          ) : (
-            <Text
-              style={[
-                styles.messageText,
-                message.isUser ? styles.userMessageText : styles.aiMessageText,
-              ]}
-            >
-              {message.text}
+      <View key={message.id} style={[styles.messageContainer, message.isUser ? styles.userMessage : styles.aiMessage]}>
+        <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
+          {isLast && !message.isUser
+            ? <Typewriter text={displayText} />
+            : <Text style={[styles.messageText, message.isUser ? styles.userMessageText : styles.aiMessageText]}>
+              {displayText}
             </Text>
-          )}
-          <Text
-            style={[
-              styles.timestamp,
-              message.isUser ? styles.userTimestamp : styles.aiTimestamp,
-            ]}
-          >
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          }
+          <Text style={[styles.timestamp, message.isUser ? styles.userTimestamp : styles.aiTimestamp]}>
+            {timeStr}
           </Text>
         </View>
+
+        {!message.isUser && (
+          <AddToMealPlanButton content={message.text} />
+        )}
       </View>
     );
   };
 
-  const renderQuickSuggestions = () => {
-    const suggestions = [
-      "What should my meal plan be?",
-      "How do I lose weight?",
-      "Give me meal ideas",
-      "What can you help me with?",
-    ];
+  const renderQuickSuggestions = () => (
+    <View style={styles.suggestionsContainer}>
+      <Text style={styles.suggestionsTitle}>Quick Questions:</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
+        {[
+          'What should my meal plan be?',
+          'How do I lose weight?',
+          'Give me meal ideas',
+          'What can you help me with?',
+        ].map((s, i) => (
+          <TouchableOpacity key={i} style={styles.suggestionButton} onPress={() => sendQuickMessage(s)}>
+            <Text style={styles.suggestionText}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 
-    return (
-      <View style={styles.suggestionsContainer}>
-        <Text style={styles.suggestionsTitle}>Quick Questions:</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.suggestionsScrollContent}
-        >
-          {suggestions.map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.suggestionButton}
-              onPress={() => sendQuickMessage(suggestion)}
-            >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  };
-
+  // ─── JSX ──────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          {/* Centered Alli avatar (no pulse) */}
-          <View style={styles.centerHeroContainer}>
-            <LinearGradient
-              colors={[getOrbColor(), '#6E006A', '#4F0232']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.pulseRing}
-            >
-              <View style={styles.pulseInner}>
-                <Image source={require('../assets/Chick2.png')} style={styles.heroImage} />
-              </View>
-            </LinearGradient>
-
-            {/* Voice control buttons */}
-            <View style={styles.voiceButtonsContainer}>
-              {/* Chat Toggle Button */}
-              <TouchableOpacity
-                style={[
-                  styles.voiceButton,
-                  styles.chatToggleButtonInline,
-                  showChat && styles.chatToggleButtonActive,
-                ]}
-                onPress={() => setShowChat(!showChat)}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name={showChat ? "chatbubbles" : "chatbubble-outline"}
-                  size={28}
-                  color={showChat ? "white" : "#0090A3"}
-                />
-                {!showChat && messages.length > 0 && (
-                  <View style={styles.chatBadgeInline}>
-                    <Text style={styles.chatBadgeText}>{messages.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* Voice Button */}
-              {!connected ? (
-                <TouchableOpacity
-                  style={[styles.voiceButton, styles.micButton]}
-                  onPress={handleConnect}
-                  activeOpacity={0.8}
-                  disabled={agentState === 'connecting'}
-                >
-                  <Ionicons
-                    name="mic"
-                    size={32}
-                    color={agentState === 'connecting' ? "#999" : "#0090A3"}
-                  />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.voiceButton, styles.endButton]}
-                  onPress={handleDisconnect}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="close" size={32} color="white" />
-                </TouchableOpacity>
-              )}
-
-              {/* Mute Button (when connected) */}
-              {connected && (
-                <TouchableOpacity
-                  style={[styles.voiceButton, styles.muteButton, muted && styles.mutedButton]}
-                  onPress={handleMuteToggle}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={muted ? "mic-off" : "mic"}
-                    size={24}
-                    color={muted ? "#FF6B6B" : "#0090A3"}
-                  />
-                </TouchableOpacity>
-              )}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Animated.View style={[styles.centerHeroContainer, { opacity: fadeAnim }]}>
+          <View style={styles.pulseRing}>
+            <View style={styles.pulseInner}>
+              <Image
+                source={require('../assets/Chick2copy.png')}
+                style={styles.heroImage}
+              />
             </View>
-
-            {/* Status text */}
-            <Text style={styles.statusText}>
-              {currentUserText || currentAgentText || getStateText()}
-            </Text>
           </View>
+        </Animated.View>
 
-          {/* Chat Interface - Only visible when showChat is true */}
-          {showChat && (
-            <>
-              {/* Messages */}
-              <ScrollView
-                ref={scrollViewRef}
-                style={styles.messagesContainer}
-                contentContainerStyle={styles.messagesContent}
-                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-              >
-                {messages.length === 0 ? (
-                  <View style={styles.centerHeroContainer}>
-                    <Text style={styles.statusText}>{getStateText()}</Text>
-                  </View>
-                ) : (
-                  messages.map((message, index) => renderMessage(message, index === messages.length - 1))
-                )}
-              </ScrollView>
-              {/* Quick Suggestions */}
-              {messages.length <= 1 && renderQuickSuggestions()}
-
-              {/* Input */}
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.textInput}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder="Ask Alli anything about nutrition..."
-                  placeholderTextColor="#999"
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.sendButton,
-                    !inputText.trim() && styles.sendButtonDisabled,
-                  ]}
-                  onPress={sendMessage}
-                  disabled={!inputText.trim() || isProcessing}
-                >
-                  <Ionicons
-                    name="send"
-                    size={20}
-                    color={inputText.trim() && !isProcessing ? '#B9A68D' : '#ccc'}
-                  />
-                </TouchableOpacity>
+        <View style={styles.voiceButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.voiceButton, styles.chatToggleButtonInline, showChat && styles.chatToggleButtonActive]}
+            onPress={() => setShowChat(!showChat)}
+            activeOpacity={0.8}
+          >
+            {!showChat && messages.length > 0 && (
+              <View style={styles.chatBadgeInline}>
+                <Text style={styles.chatBadgeText}>{messages.length}</Text>
               </View>
-            </>
+            )}
+            <Ionicons
+              name={showChat ? 'chatbubbles' : 'chatbubbles-outline'}
+              size={26}
+              color={showChat ? '#fff' : '#0090A3'}
+            />
+          </TouchableOpacity>
+
+          {!connected ? (
+            <TouchableOpacity style={[styles.voiceButton, styles.micButton]} onPress={handleConnect} activeOpacity={0.8}>
+              <Ionicons name="mic-outline" size={28} color="#0090A3" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.voiceButton, styles.endButton]} onPress={handleDisconnect} activeOpacity={0.8}>
+              <Ionicons name="stop-circle-outline" size={28} color="#fff" />
+            </TouchableOpacity>
           )}
-        </KeyboardAvoidingView>
-      </Animated.View>
+
+          {connected && (
+            <TouchableOpacity
+              style={[styles.voiceButton, styles.muteButton, muted && styles.mutedButton]}
+              onPress={handleMuteToggle}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={muted ? 'mic-off-outline' : 'mic-outline'} size={22} color={muted ? '#FF6B6B' : '#0090A3'} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.statusText}>
+          {currentUserText || currentAgentText || getStateText()}
+        </Text>
+
+        {showChat && (
+          <>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            >
+              {messages.length === 0
+                ? <Text style={styles.emptyText}>Ask Alli anything about nutrition!</Text>
+                : messages.map((m, i) => renderMessage(m, i === messages.length - 1))
+              }
+              {messages.length <= 1 && renderQuickSuggestions()}
+            </ScrollView>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask Alli anything about nutrition..."
+                placeholderTextColor="#999"
+                multiline
+                onSubmitEditing={sendMessage}
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, (!inputText.trim() || isProcessing) && styles.sendButtonDisabled]}
+                onPress={sendMessage}
+                disabled={!inputText.trim() || isProcessing}
+              >
+                <Ionicons name="send" size={20} color={inputText.trim() && !isProcessing ? '#0090A3' : '#ccc'} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#CDC4B7',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#CDC4B7' },
+  keyboardAvoidingView: { flex: 1 },
+
   centerHeroContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 24,
     paddingBottom: 16,
-  },
-  voiceButtonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    gap: 12,
-  },
-  chatToggleButtonInline: {
-    backgroundColor: '#E6E1D8',
-    borderWidth: 2,
-    borderColor: '#0090A3',
-  },
-  chatToggleButtonActive: {
-    backgroundColor: '#6E006A',
-    borderColor: '#6E006A',
-  },
-  chatBadgeInline: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  voiceButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  micButton: {
-    backgroundColor: '#E6E1D8',
-    borderWidth: 2,
-    borderColor: '#0090A3',
-  },
-  endButton: {
-    backgroundColor: '#FF6B6B',
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-  },
-  muteButton: {
-    backgroundColor: '#E6E1D8',
-    borderWidth: 2,
-    borderColor: '#0090A3',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  mutedButton: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FF6B6B',
-  },
-  statusText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#0090A3',
-    fontWeight: '600',
-    textAlign: 'center',
-    minHeight: 24,
   },
   pulseRing: {
     width: Dimensions.get('window').width * 0.6,
@@ -993,113 +785,104 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: Dimensions.get('window').width * 0.28,
-    resizeMode: 'cover',
+  heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+
+  voiceButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 12,
   },
-  messagesContainer: {
-    flex: 1,
+  voiceButton: {
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5,
   },
-  messagesContent: {
-    padding: 20,
-    paddingBottom: 120,
+  chatToggleButtonInline: { backgroundColor: '#E6E1D8', borderWidth: 2, borderColor: '#0090A3' },
+  chatToggleButtonActive: { backgroundColor: '#6E006A', borderColor: '#6E006A' },
+  chatBadgeInline: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#FF6B6B', borderRadius: 10,
+    minWidth: 18, height: 18,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
-  messageContainer: {
-    marginBottom: 16,
+  chatBadgeText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+  micButton: { backgroundColor: '#E6E1D8', borderWidth: 2, borderColor: '#0090A3' },
+  endButton: { backgroundColor: '#FF6B6B', borderWidth: 2, borderColor: '#FF6B6B' },
+  muteButton: {
+    backgroundColor: '#E6E1D8', borderWidth: 2, borderColor: '#0090A3',
+    width: 56, height: 56, borderRadius: 28,
   },
-  userMessage: {
-    alignItems: 'flex-end',
+  mutedButton: { backgroundColor: '#FEE2E2', borderColor: '#FF6B6B' },
+
+  statusText: {
+    marginTop: 12, fontSize: 16, color: '#0090A3',
+    fontWeight: '600', textAlign: 'center', minHeight: 24,
   },
-  aiMessage: {
-    alignItems: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-  },
-  userBubble: {
-    backgroundColor: '#0090A3',
-    borderBottomRightRadius: 4,
-  },
+
+  messagesContainer: { flex: 1 },
+  messagesContent: { padding: 16, paddingBottom: 120 },
+  emptyText: { textAlign: 'center', color: '#999', marginTop: 40, fontSize: 15 },
+
+  messageContainer: { marginBottom: 16 },
+  userMessage: { alignItems: 'flex-end' },
+  aiMessage: { alignItems: 'flex-start' },
+
+  messageBubble: { maxWidth: '85%', padding: 12, borderRadius: 16 },
+  userBubble: { backgroundColor: '#0090A3', borderBottomRightRadius: 4 },
   aiBubble: {
     backgroundColor: '#E6E1D8',
     borderBottomLeftRadius: 4,
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+      android: { elevation: 2 },
     }),
   },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+
+  messageText: { fontSize: 15, lineHeight: 22 },
+  userMessageText: { color: '#fff' },
+  aiMessageText: { color: '#2A2A2A' },
+  timestamp: { fontSize: 11, marginTop: 4 },
+  userTimestamp: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  aiTimestamp: { color: '#999' },
+
+  addPlanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0090A3',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    ...Platform.select({
+      ios: { shadowColor: '#0090A3', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
+      android: { elevation: 4 },
+    }),
   },
-  userMessageText: {
-    color: 'white',
-  },
-  aiMessageText: {
-    color: '#2A2A2A',
-  },
-  timestamp: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'right',
-  },
-  aiTimestamp: {
-    color: '#999',
-  },
-  suggestionsContainer: {
-    padding: 20,
-    paddingTop: 0,
-  },
-  suggestionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0090A3',
-    marginBottom: 12,
-  },
-  suggestionsScrollContent: {
-    paddingRight: 20,
-  },
+  addPlanBtnAdded: { backgroundColor: '#059669' },
+  addPlanBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
+
+  suggestionsContainer: { padding: 16, paddingTop: 0 },
+  suggestionsTitle: { fontSize: 15, fontWeight: '600', color: '#0090A3', marginBottom: 10 },
+  suggestionsScrollContent: { paddingRight: 16 },
   suggestionButton: {
-    backgroundColor: '#E6E1D8',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#E6E1D8', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#ddd',
   },
-  suggestionText: {
-    fontSize: 14,
-    color: '#0090A3',
-    fontWeight: '500',
-  },
-  chatBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
+  suggestionText: { fontSize: 13, color: '#0090A3', fontWeight: '500' },
+
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     backgroundColor: '#E6E1D8',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: 100,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
@@ -1110,49 +893,25 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 15,
     maxHeight: 100,
-    marginRight: 12,
+    marginRight: 10,
+    backgroundColor: '#fff',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center',
   },
-  sendButtonDisabled: {
-    backgroundColor: '#F0F0F0',
-  },
+  sendButtonDisabled: { backgroundColor: '#F0F0F0' },
+
   typingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#E6E1D8',
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    minHeight: 46,
-    minWidth: 60,
-    justifyContent: 'center',
-    // alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', padding: 12,
+    backgroundColor: '#E6E1D8', borderRadius: 16, borderBottomLeftRadius: 4,
+    minHeight: 46, minWidth: 60, justifyContent: 'center',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+      android: { elevation: 2 },
     }),
   },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#6E006A',
-    marginHorizontal: 3,
-  },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6E006A', marginHorizontal: 3 },
 });
