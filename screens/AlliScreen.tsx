@@ -38,9 +38,6 @@ registerGlobals();
 
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://tgs-g8ihpbv8.livekit.cloud';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
-const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
-const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
-const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 const RAG_FALLBACK_URL = process.env.EXPO_PUBLIC_RAG_FALLBACK_URL;
 
@@ -167,23 +164,18 @@ function AddToMealPlanButton({ content }: { content: string }) {
 }
 
 // ─── RAG response extractor ───────────────────────────────────────────────────
-// THE FIX: reads body as raw text first (never silently fails like .json() does),
-// then intelligently parses JSON and checks every known field name.
 async function extractRagResponse(ragRes: Response): Promise<string> {
-  // Step 1 — always read as text. This never throws unlike .json()
   const rawText = await ragRes.text();
   console.log('🔍 RAG raw body (first 400):', rawText.slice(0, 400));
 
   const trimmed = rawText.trim();
   if (!trimmed) return '';
 
-  // Step 2 — if not JSON-shaped, return as plain text directly
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
     console.log('✅ RAG plain text response');
     return trimmed;
   }
 
-  // Step 3 — parse JSON
   let j: any;
   try {
     j = JSON.parse(trimmed);
@@ -192,15 +184,12 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     return trimmed;
   }
 
-  // Step 4 — unwrap array e.g. [{ ... }]
   if (Array.isArray(j) && j.length > 0) j = j[0];
 
   console.log('🔍 RAG parsed keys:', Object.keys(j ?? {}));
 
-  // Step 5 — already a bare string
   if (typeof j === 'string') return j.trim();
 
-  // Step 6 — check every field name across all known RAG/LLM API shapes
   const candidates: Array<string | undefined> = [
     j?.output,
     j?.response,
@@ -214,10 +203,8 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     j?.completion,
     j?.bot,
     j?.assistant,
-    // OpenAI-compatible
     j?.choices?.[0]?.message?.content,
     j?.choices?.[0]?.text,
-    // nested under data
     j?.data?.output,
     j?.data?.response,
     j?.data?.text,
@@ -234,7 +221,6 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     }
   }
 
-  // Step 7 — nothing matched; log the full object so the correct key is visible
   console.warn('⚠️ RAG: no known field matched. Full object:', JSON.stringify(j));
   return '';
 }
@@ -382,49 +368,22 @@ ${MEAL_PLAN_SYSTEM_PROMPT}`;
 
       let assistantText = '';
 
-      // ── 1. Novita ──────────────────────────────────────────────────────────
-      try {
-        const controller = new AbortController();
-        const isMealPlan =
-          question.toLowerCase().includes('plan') ||
-          question.toLowerCase().includes('diet');
-        const tid = setTimeout(() => {
-          console.log('⏰ Novita timeout');
-          controller.abort();
-        }, isMealPlan ? 45_000 : 20_000);
-
-        const res = await fetch(NOVITA_API_URL as string, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${NOVITA_API_KEY?.trim()}`,
-          },
-          body: JSON.stringify({
-            model: NOVITA_MODEL,
-            messages: messagesToSend,
-            temperature: 0.3,
-            max_tokens: 1500,
-            reasoning: { enabled: false },
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(tid);
-
-        if (res.ok) {
-          const json = await res.json();
-          assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
-          if (assistantText) console.log('✅ Novita OK. Length:', assistantText.length);
-        } else {
-          console.log('❌ Novita HTTP error:', res.status);
-        }
-      } catch (e: any) {
-        console.log('❌ Novita failed:', e.message);
-      }
-      // ── 2. OpenAI Fallback ──────────────────────────────────────────────────
-      if (!assistantText && OPENAI_API_KEY) {
+      // ── 1. OpenAI (Primary) ────────────────────────────────────────────────
+      if (OPENAI_API_KEY) {
         try {
-          console.log('🔄 Falling back to OpenAI...');
+          console.log('🔄 Calling OpenAI...');
+          const controller = new AbortController();
+          const isMealPlan =
+            question.toLowerCase().includes('plan') ||
+            question.toLowerCase().includes('diet') ||
+            question.toLowerCase().includes('meal') ||
+            question.toLowerCase().includes('week') ||
+            question.toLowerCase().includes('food');
+          const tid = setTimeout(() => {
+            console.log('⏰ OpenAI timeout');
+            controller.abort();
+          }, isMealPlan ? 90_000 : 30_000);
+
           const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -435,8 +394,11 @@ ${MEAL_PLAN_SYSTEM_PROMPT}`;
               model: 'gpt-4o-mini',
               messages: messagesToSend,
               temperature: 0.7,
+              max_tokens: isMealPlan ? 4000 : 1500,
             }),
+            signal: controller.signal,
           });
+          clearTimeout(tid);
 
           if (openAiRes.ok) {
             const data = await openAiRes.json();
@@ -445,12 +407,12 @@ ${MEAL_PLAN_SYSTEM_PROMPT}`;
           } else {
             console.log('❌ OpenAI HTTP error:', openAiRes.status);
           }
-        } catch (e) {
-          console.error('❌ OpenAI request failed:', e);
+        } catch (e: any) {
+          console.error('❌ OpenAI request failed:', e.message);
         }
       }
 
-      // ── 3. Commit or error ─────────────────────────────────────────────────
+      // ── 2. Commit or error ─────────────────────────────────────────────────
       if (assistantText) {
         setMessages(prev => [
           ...prev.filter(m => m.id !== optimisticAI.id),
