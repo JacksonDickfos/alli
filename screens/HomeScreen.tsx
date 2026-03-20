@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface HomeScreenProps {
@@ -23,6 +24,7 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { state, getCurrentDayLog, getTodaysTotals } = useApp();
+  const { colors } = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState('');
   const pulse = useRef(new Animated.Value(1)).current;
@@ -32,6 +34,269 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const goals = state.nutritionGoals;
   const user = state.user;
   const weeklyLogs = (state as any).dailyLogs || [];
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        scrollView: {
+          flex: 1,
+        },
+        scrollContent: {
+          padding: 20,
+          paddingBottom: 100,
+        },
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+        },
+        greeting: {
+          fontSize: 24,
+          color: colors.textSecondary,
+          fontWeight: '400',
+        },
+        userName: {
+          fontSize: 28,
+          fontWeight: 'bold',
+          color: colors.accent,
+        },
+        timeContainer: {
+          alignItems: 'flex-end',
+        },
+        time: {
+          fontSize: 20,
+          fontWeight: 'bold',
+          color: colors.textPrimary,
+        },
+        date: {
+          fontSize: 14,
+          color: colors.textSecondary,
+          marginTop: 2,
+        },
+        progressCard: {
+          backgroundColor: colors.surface,
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 20,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+            android: {
+              elevation: 4,
+            },
+          }),
+        },
+        cardTitle: {
+          fontSize: 20,
+          fontWeight: 'bold',
+          color: colors.accent,
+          marginBottom: 16,
+        },
+        progressItem: {
+          marginBottom: 16,
+        },
+        progressHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        },
+        progressLabel: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.textPrimary,
+        },
+        progressValue: {
+          fontSize: 14,
+          color: colors.textSecondary,
+        },
+        progressBarContainer: {
+          height: 8,
+          backgroundColor: colors.border,
+          borderRadius: 4,
+          overflow: 'hidden',
+        },
+        progressBar: {
+          height: '100%',
+          borderRadius: 4,
+        },
+        macroSummary: {
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          marginTop: 16,
+          paddingTop: 16,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        macroItem: {
+          alignItems: 'center',
+        },
+        macroValue: {
+          fontSize: 18,
+          fontWeight: 'bold',
+          color: colors.accent,
+        },
+        macroLabel: {
+          fontSize: 12,
+          color: colors.textSecondary,
+          marginTop: 4,
+        },
+        motivationBubble: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.surface,
+          borderRadius: 16,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          marginBottom: 16,
+        },
+        motivationBubbleText: {
+          marginLeft: 8,
+          color: colors.textPrimary,
+        },
+        alliFaceIcon: {
+          width: 32,
+          height: 32,
+          resizeMode: 'cover',
+          borderRadius: 16,
+        },
+        motivationText: {
+          fontSize: 16,
+          color: colors.textPrimary,
+          marginLeft: 12,
+          flex: 1,
+        },
+        cardBlock: {
+          backgroundColor: colors.surface,
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 20,
+        },
+        upcomingMealRow: {
+          position: 'relative',
+        },
+        upcomingMealHeroImage: {
+          width: '100%',
+          height: 160,
+          borderRadius: 12,
+          resizeMode: 'cover',
+        },
+        upcomingMealButtonOverlay: {
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: 16,
+          zIndex: 2,
+        },
+        upcomingMealButtonGradient: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 12,
+          borderRadius: 12,
+        },
+        primaryButton: {
+          backgroundColor: colors.buttonPrimary,
+          borderRadius: 12,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        primaryButtonText: {
+          color: colors.tabBarActive,
+          fontWeight: '600',
+        },
+        consultButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 12,
+          borderRadius: 12,
+        },
+        consultText: {
+          color: colors.tabBarActive,
+          fontWeight: '600',
+          marginLeft: 8,
+        },
+        tilesRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: 20,
+        },
+        tile: {
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 14,
+          alignItems: 'center',
+          width: (width - 60) / 3,
+          ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
+            android: { elevation: 2 },
+          }),
+        },
+        tileLabel: {
+          color: colors.textSecondary,
+          fontSize: 12,
+          marginTop: 6,
+        },
+        tileValue: {
+          fontWeight: '700',
+          color: colors.textPrimary,
+          marginTop: 4,
+        },
+        quickActionsContainer: {
+          marginBottom: 20,
+        },
+        sectionTitle: {
+          fontSize: 20,
+          fontWeight: 'bold',
+          color: colors.accent,
+          marginBottom: 16,
+        },
+        sectionHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        },
+        seeAllText: {
+          fontSize: 16,
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        actionsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        actionCard: {
+          width: (width - 60) / 2,
+          height: 100,
+          marginBottom: 12,
+          borderRadius: 16,
+          overflow: 'hidden',
+        },
+        actionGradient: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        actionText: {
+          color: colors.tabBarActive,
+          fontSize: 16,
+          fontWeight: 'bold',
+          marginTop: 8,
+        },
+      }),
+    [colors]
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -83,29 +348,29 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     return calories;
   };
 
-  const getProgressColor = (percentage: number, type: 'protein' | 'carbs' | 'fat' | 'calories' = 'calories') => {
-    if (type === 'protein') {
-      if (percentage >= 121) return '#FF3B30'; // Red from 121% and above
-      if (percentage >= 90) return '#4CAF50'; // Green 90-120%
-      return '#0090A3'; // Teal default
-    } else if (type === 'carbs') {
-      if (percentage >= 111) return '#FF3B30'; // Red from 111% and above
-      if (percentage >= 90) return '#4CAF50'; // Green 90-110%
-      return '#0090A3'; // Teal default
-    } else {
-      // calories/energy and fat
-      if (type === 'calories') {
-        if (percentage >= 111) return '#FF3B30'; // Red from 111% and above
-        if (percentage >= 90) return '#4CAF50'; // Green 90-110%
-        return '#0090A3'; // Teal default
-      } else {
-        // fat
-        if (percentage > 100) return '#FF3B30'; // Red over 100%
-        if (percentage >= 80) return '#FF9800'; // Orange 80-100%
-        return '#0090A3'; // Teal default
+  const getProgressColor = useCallback(
+    (percentage: number, type: 'protein' | 'carbs' | 'fat' | 'calories' = 'calories') => {
+      if (type === 'protein') {
+        if (percentage >= 121) return '#FF3B30';
+        if (percentage >= 90) return '#4CAF50';
+        return colors.accent;
       }
-    }
-  };
+      if (type === 'carbs') {
+        if (percentage >= 111) return '#FF3B30';
+        if (percentage >= 90) return '#4CAF50';
+        return colors.accent;
+      }
+      if (type === 'calories') {
+        if (percentage >= 111) return '#FF3B30';
+        if (percentage >= 90) return '#4CAF50';
+        return colors.accent;
+      }
+      if (percentage > 100) return '#FF3B30';
+      if (percentage >= 80) return '#FF9800';
+      return colors.accent;
+    },
+    [colors.accent]
+  );
 
   // --- Motivational message rotation (based on day index) ---
   const motivationalMessages = useMemo(
@@ -279,8 +544,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           style={[styles.actionCard, { width: (width - 60) / 2 }]}
           onPress={() => navigation.navigate('Nutrition')}
         >
-          <LinearGradient colors={['#0090A3', '#28657A']} style={styles.actionGradient}>
-            <MaterialCommunityIcons name="camera" size={32} color="white" />
+          <LinearGradient colors={colors.gradientPrimary} style={styles.actionGradient}>
+            <MaterialCommunityIcons name="camera" size={32} color={colors.tabBarActive} />
             <Text style={styles.actionText}>Log Food</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -289,8 +554,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           style={[styles.actionCard, { width: (width - 60) / 2 }]}
           onPress={() => navigation.navigate('Goals')}
         >
-          <LinearGradient colors={['#6E006A', '#4F0232']} style={styles.actionGradient}>
-            <MaterialCommunityIcons name="clipboard-list-outline" size={32} color="white" />
+          <LinearGradient
+            colors={[colors.gradientPurple[1], colors.gradientPurple[2]]}
+            style={styles.actionGradient}
+          >
+            <MaterialCommunityIcons name="clipboard-list-outline" size={32} color={colors.tabBarActive} />
             <Text style={styles.actionText}>Meal Plan</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -303,15 +571,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     const lastConsultDays = 8; // Placeholder derived metric; wire when available
     const needsAttention = lastConsultDays >= 7;
     const animatedStyle = { transform: [{ scale: pulse }] };
-    // Use the same blue → purple → red gradient as the Alli pulsing button
-    const gradient = ['#0090A3', '#6E006A', '#4F0232'];
     return (
       <View style={styles.cardBlock}>
         <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>Upcoming Consult</Text>
         <Animated.View style={animatedStyle}>
           <TouchableOpacity onPress={() => navigation.navigate('Alli')}>
-            <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.consultButton}>
-              <MaterialCommunityIcons name="calendar" size={22} color="#fff" />
+            <LinearGradient
+              colors={colors.gradientPurple}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.consultButton}
+            >
+              <MaterialCommunityIcons name="calendar" size={22} color={colors.tabBarActive} />
               <Text style={styles.consultText}>Schedule Consult With Me</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -341,7 +612,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
     const Tile = ({ icon, label, value, onPress } : any) => (
       <TouchableOpacity style={styles.tile} onPress={onPress}>
-        <MaterialCommunityIcons name={icon} size={22} color="#B9A68D" />
+        <MaterialCommunityIcons name={icon} size={22} color={colors.textMuted} />
         <Text style={styles.tileLabel}>{label}</Text>
         {value !== undefined && <Text style={styles.tileValue}>{value}</Text>}
       </TouchableOpacity>
@@ -398,7 +669,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             <View style={styles.upcomingMealButtonOverlay} pointerEvents="box-none">
               <TouchableOpacity onPress={() => navigation.navigate('Goals')} activeOpacity={0.85}>
                 <LinearGradient
-                  colors={['#0090A3', '#6E006A', '#4F0232']}
+                  colors={colors.gradientPurple}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.consultButton, styles.upcomingMealButtonGradient]}
@@ -427,262 +698,3 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#CDC4B7',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 24,
-    color: '#666',
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0090A3',
-  },
-  timeContainer: {
-    alignItems: 'flex-end',
-  },
-  time: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2A2A2A',
-  },
-  date: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  progressCard: {
-    backgroundColor: '#E6E1D8',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0090A3',
-    marginBottom: 16,
-  },
-  progressItem: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2A2A2A',
-  },
-  progressValue: {
-    fontSize: 14,
-    color: '#666',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  macroSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  macroItem: {
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0090A3',
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  motivationBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E6E1D8',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-  },
-  motivationBubbleText: {
-    marginLeft: 8,
-    color: '#2A2A2A',
-  },
-  alliFaceIcon: {
-    width: 32,
-    height: 32,
-    resizeMode: 'cover',
-    borderRadius: 16,
-  },
-  motivationText: {
-    fontSize: 16,
-    color: '#2A2A2A',
-    marginLeft: 12,
-    flex: 1,
-  },
-  cardBlock: {
-    backgroundColor: '#E6E1D8',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  upcomingMealRow: {
-    position: 'relative',
-  },
-  upcomingMealHeroImage: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  upcomingMealButtonOverlay: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
-    zIndex: 2,
-  },
-  upcomingMealButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  primaryButton: {
-    backgroundColor: '#0090A3',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  consultButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  consultText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  tilesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  tile: {
-    backgroundColor: '#E6E1D8',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    width: (width - 60) / 3,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
-      android: { elevation: 2 },
-    }),
-  },
-  tileLabel: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  tileValue: {
-    fontWeight: '700',
-    color: '#2A2A2A',
-    marginTop: 4,
-  },
-  quickActionsContainer: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0090A3',
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  seeAllText: {
-    fontSize: 16,
-    color: '#0090A3',
-    fontWeight: '600',
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  actionCard: {
-    width: (width - 60) / 2,
-    height: 100,
-    marginBottom: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  actionGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-});

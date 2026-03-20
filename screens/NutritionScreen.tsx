@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,8 @@ import { FoodAnalysisService } from '../services/FoodAnalysisService';
 import type { FoodAnalysisResult } from '../services/FoodAnalysisService';
 import { analyzeImage as analyzeImageWithPassio } from '../services/PassioService';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
+import type { ThemeColors } from '../theme/palettes';
 
 interface NutritionScreenProps {
   navigation: any;
@@ -43,6 +45,8 @@ const getLocalDateString = (date: Date = new Date()): string => {
 };
 
 export default function NutritionScreen({ navigation, route }: NutritionScreenProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createNutritionStyles(colors), [colors]);
   const { state, getCurrentDayLog, getTodaysTotals, addFoodItem, removeFoodItem, addHydrationEntry, addBowelEntry, removeBowelEntry, addSymptomEntry, removeSymptomEntry, addExerciseEntry, removeExerciseEntry } = useApp();
   const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -3779,12 +3783,12 @@ export default function NutritionScreen({ navigation, route }: NutritionScreenPr
                 }}
               >
                 <LinearGradient
-                  colors={['#0090A3', '#6E006A', '#4F0232', '#3A86FF']}
+                  colors={colors.gradientAnalyze}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.loadingIconGradient}
                 >
-                  <MaterialCommunityIcons name="food-apple" size={48} color="#fff" />
+                  <MaterialCommunityIcons name="food-apple" size={48} color={colors.tabBarActive} />
                 </LinearGradient>
               </Animated.View>
             </Animated.View>
@@ -3833,12 +3837,12 @@ export default function NutritionScreen({ navigation, route }: NutritionScreenPr
         ]}
       >
         <LinearGradient
-          colors={['#0090A3', '#6E006A', '#4F0232']}
+          colors={colors.gradientPurple}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.successIconGradient}
         >
-          <MaterialCommunityIcons name="check-circle" size={64} color="#fff" />
+          <MaterialCommunityIcons name="check-circle" size={64} color={colors.tabBarActive} />
         </LinearGradient>
         <Text style={styles.successText}>Food Logged!</Text>
       </Animated.View>
@@ -3847,18 +3851,27 @@ export default function NutritionScreen({ navigation, route }: NutritionScreenPr
       <View pointerEvents="box-none" style={styles.floatingActionsWrapper}>
         <View style={styles.floatingActions}>
           <TouchableOpacity onPress={showMealTypeSelector} style={styles.floatingActionButton}>
-            <LinearGradient colors={['#6E006A', '#4F0232']} style={styles.floatingActionGradient}>
-              <Ionicons name="camera" size={22} color="#fff" />
+            <LinearGradient
+              colors={[colors.gradientPurple[1], colors.gradientPurple[2]]}
+              style={styles.floatingActionGradient}
+            >
+              <Ionicons name="camera" size={22} color={colors.tabBarActive} />
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity onPress={pickImage} style={styles.floatingActionButton}>
-            <LinearGradient colors={['#6E006A', '#4F0232']} style={styles.floatingActionGradient}>
-              <Ionicons name="image" size={22} color="#fff" />
+            <LinearGradient
+              colors={[colors.gradientPurple[1], colors.gradientPurple[2]]}
+              style={styles.floatingActionGradient}
+            >
+              <Ionicons name="image" size={22} color={colors.tabBarActive} />
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity onPress={openManualFoodModal} style={styles.floatingActionButton}>
-            <LinearGradient colors={['#6E006A', '#4F0232']} style={styles.floatingActionGradient}>
-              <Ionicons name="add" size={22} color="#fff" />
+            <LinearGradient
+              colors={[colors.gradientPurple[1], colors.gradientPurple[2]]}
+              style={styles.floatingActionGradient}
+            >
+              <Ionicons name="add" size={22} color={colors.tabBarActive} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -3867,10 +3880,11 @@ export default function NutritionScreen({ navigation, route }: NutritionScreenPr
   );
 }
 
-const styles = StyleSheet.create({
+function createNutritionStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#CDC4B7',
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
@@ -3882,7 +3896,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -3893,7 +3907,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actionButton: {
-    backgroundColor: '#E6E1D8',
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
@@ -3912,7 +3926,7 @@ const styles = StyleSheet.create({
     }),
   },
   actionButtonText: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
     marginTop: 8,
   },
@@ -3935,7 +3949,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   actionButtonTeal: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
@@ -3961,7 +3975,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   card: {
-    backgroundColor: '#E6E1D8',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -3980,7 +3994,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
     marginBottom: 16,
   },
   progressItem: {
@@ -3994,7 +4008,7 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   progressValue: {
     fontSize: 14,
@@ -4014,7 +4028,7 @@ const styles = StyleSheet.create({
   macroValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
   },
   macroLabel: {
     fontSize: 12,
@@ -4033,7 +4047,7 @@ const styles = StyleSheet.create({
   macroProgressLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   macroProgressRight: {
     flexDirection: 'row',
@@ -4071,7 +4085,7 @@ const styles = StyleSheet.create({
   mealTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
     marginBottom: 12,
   },
   foodItem: {
@@ -4108,7 +4122,7 @@ const styles = StyleSheet.create({
   foodName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   foodServing: {
@@ -4127,7 +4141,7 @@ const styles = StyleSheet.create({
   foodCalories: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0090A3',
+    color: colors.accent,
   },
   macroText: {
     fontSize: 12,
@@ -4140,7 +4154,7 @@ const styles = StyleSheet.create({
   },
   mealType: {
     fontSize: 12,
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
   },
   confidence: {
@@ -4161,7 +4175,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
     marginBottom: 12,
   },
   logItem: {
@@ -4184,7 +4198,7 @@ const styles = StyleSheet.create({
   logItemTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     flex: 1,
   },
   logItemTime: {
@@ -4210,7 +4224,7 @@ const styles = StyleSheet.create({
     width: Dimensions.get('window').width,
   },
   manualFoodModal: {
-    backgroundColor: '#E6E1D8',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     width: Dimensions.get('window').width - 40,
@@ -4226,7 +4240,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   textInput: {
@@ -4271,7 +4285,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   saveButton: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -4308,7 +4322,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   modalContent: {
-    backgroundColor: '#E6E1D8',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     width: '90%',
@@ -4317,7 +4331,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0090A3',
+    color: colors.accent,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -4331,7 +4345,7 @@ const styles = StyleSheet.create({
   mealTypeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   cancelButton: {
     backgroundColor: '#E0E0E0',
@@ -4375,22 +4389,24 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   loadingContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     minWidth: 280,
     maxWidth: 320,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   loadingText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginTop: 16,
   },
   loadingSubtext: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 8,
   },
   loadingIconGradient: {
@@ -4410,14 +4426,14 @@ const styles = StyleSheet.create({
   loadingProgressBarBackground: {
     width: 240,
     height: 8,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: colors.border,
     borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
   },
   loadingProgressBarFill: {
     height: '100%',
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.buttonPrimary,
     borderRadius: 4,
     position: 'absolute',
     left: 0,
@@ -4428,7 +4444,7 @@ const styles = StyleSheet.create({
   loadingProgressBarText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0090A3',
+    color: colors.buttonPrimary,
     marginTop: 8,
   },
   successOverlay: {
@@ -4497,7 +4513,7 @@ const styles = StyleSheet.create({
   },
   recognitionOptionSelected: {
     backgroundColor: '#E6F7F9',
-    borderColor: '#0090A3',
+    borderColor: colors.accent,
   },
   recognitionOptionText: {
     fontSize: 16,
@@ -4506,7 +4522,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   recognitionOptionTextSelected: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
   },
   recognitionOptionConfidence: {
@@ -4541,15 +4557,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#0090A3',
+    borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   portionQuickButtonSelected: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
   },
   portionQuickButtonText: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
   },
   portionQuickButtonTextSelected: {
@@ -4601,7 +4617,7 @@ const styles = StyleSheet.create({
   ingredientName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 4,
     flexShrink: 0,
   },
@@ -4657,7 +4673,7 @@ const styles = StyleSheet.create({
   },
   ingredientServingGrams: {
     fontSize: 14,
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '500',
   },
   ingredientServingEnergy: {
@@ -4710,7 +4726,7 @@ const styles = StyleSheet.create({
   adjustServingIngredientName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   adjustServingCurrentInfo: {
@@ -4723,7 +4739,7 @@ const styles = StyleSheet.create({
   adjustServingLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   adjustServingDateTimeRow: {
@@ -4746,7 +4762,7 @@ const styles = StyleSheet.create({
   adjustServingDateTimeText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   datePickerModal: {
     backgroundColor: '#FFFFFF',
@@ -4769,15 +4785,15 @@ const styles = StyleSheet.create({
   datePickerOptionSelected: {
     backgroundColor: '#E6F7F9',
     borderWidth: 1,
-    borderColor: '#0090A3',
+    borderColor: colors.accent,
   },
   datePickerOptionText: {
     fontSize: 16,
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     fontWeight: '500',
   },
   datePickerOptionTextSelected: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
   },
   adjustServingInputs: {
@@ -4815,7 +4831,7 @@ const styles = StyleSheet.create({
   adjustServingUnitText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   adjustServingUnitDropdown: {
     position: 'absolute',
@@ -4845,10 +4861,10 @@ const styles = StyleSheet.create({
   },
   adjustServingUnitOptionText: {
     fontSize: 16,
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   adjustServingUnitOptionTextSelected: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
   },
   adjustServingScrollContainer: {
@@ -4866,7 +4882,7 @@ const styles = StyleSheet.create({
     top: 12,
     bottom: 12,
     width: 2,
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     zIndex: 10,
     marginLeft: -1,
   },
@@ -4885,7 +4901,7 @@ const styles = StyleSheet.create({
   adjustServingScrollTickMajor: {
     width: 2,
     height: 30,
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
@@ -4901,7 +4917,7 @@ const styles = StyleSheet.create({
   },
   adjustServingScrollTickLabel: {
     fontSize: 10,
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
@@ -4930,14 +4946,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#0090A3',
+    borderColor: colors.accent,
     alignItems: 'center',
   },
   mealTypePillSelected: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
   },
   mealTypePillText: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -5006,7 +5022,7 @@ const styles = StyleSheet.create({
   },
   hydrationVolume: {
     fontSize: 14,
-    color: '#0090A3',
+    color: colors.accent,
     textAlign: 'center',
     width: '100%',
     minWidth: 200,
@@ -5019,7 +5035,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   quickAddButton: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 20,
@@ -5041,7 +5057,7 @@ const styles = StyleSheet.create({
     borderColor: '#B9A68D',
   },
   addHydrationText: {
-    color: '#0090A3',
+    color: colors.accent,
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -5055,7 +5071,7 @@ const styles = StyleSheet.create({
   addHydrationButtonTeal: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 20,
@@ -5086,12 +5102,12 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   drinkTypeButtonSelected: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     borderColor: '#B9A68D',
   },
   drinkTypeButtonText: {
     fontSize: 14,
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   drinkTypeButtonTextSelected: {
     color: 'white',
@@ -5119,7 +5135,7 @@ const styles = StyleSheet.create({
   timePickerLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   timePickerScroll: {
@@ -5140,13 +5156,13 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   timePickerItemSelected: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     marginHorizontal: 0,
   },
   timePickerText: {
     fontSize: 16,
-    color: '#2A2A2A',
+    color: colors.textPrimary,
   },
   timePickerTextSelected: {
     color: 'white',
@@ -5188,7 +5204,7 @@ const styles = StyleSheet.create({
   },
   iOSPickerText: {
     fontSize: 16,
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     fontWeight: '400',
   },
   timePickerButton: {
@@ -5246,7 +5262,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   timePickerOptionSelectedEdit: {
-    backgroundColor: '#0090A3',
+    backgroundColor: colors.accent,
   },
   timePickerOptionTextEdit: {
     fontSize: 18,
@@ -5268,7 +5284,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 12,
-    backgroundColor: '#E6E1D8',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 4,
@@ -5278,8 +5294,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   dateSelectorItemSelected: {
-    backgroundColor: '#0090A3',
-    borderColor: '#0090A3',
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   dateSelectorDayName: {
     fontSize: 11,
@@ -5294,7 +5310,7 @@ const styles = StyleSheet.create({
   dateSelectorDayNumber: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   dateSelectorDayNumberSelected: {
@@ -5375,7 +5391,7 @@ const styles = StyleSheet.create({
   circularProgressValue: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#2A2A2A',
+    color: colors.textPrimary,
     marginTop: 1,
   },
   circularProgressPlusIcon: {
@@ -5401,3 +5417,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+}

@@ -14,7 +14,12 @@ const PCM16AudioCaptureModule: PCM16AudioCaptureModule = PCM16AudioCapture || {
   stopRecording: () => Promise.reject(new Error('PCM16AudioCapture not available')),
 };
 
-const eventEmitter = new NativeEventEmitter(PCM16AudioCapture || undefined);
+// `new NativeEventEmitter()` throws if the argument is null/undefined.
+// When running on iOS (simulator), the native module might not be registered
+// yet, so we guard creation here and handle the missing module at runtime.
+const eventEmitter: NativeEventEmitter | null = PCM16AudioCapture
+  ? new NativeEventEmitter(PCM16AudioCapture)
+  : null;
 
 export interface AudioChunkEvent {
   audio: string; // Base64 encoded PCM16 data
@@ -46,6 +51,10 @@ export class PCM16AudioCaptureService {
 
     if (Platform.OS !== 'ios') {
       throw new Error('PCM16AudioCapture is only available on iOS');
+    }
+
+    if (!eventEmitter) {
+      throw new Error('PCM16AudioCapture native module is not available (NativeEventEmitter missing)');
     }
 
     // Set up event listeners

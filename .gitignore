@@ -36,3 +36,6 @@ yarn-error.*
 
 # environment variables
 .env
+
+# Supabase CLI (after `supabase link`)
+.supabase/

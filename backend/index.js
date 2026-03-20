@@ -35,6 +35,124 @@ const FIREWORKS_API_KEY = process.env.FIREWORKS_API_KEY; // required
 const FIREWORKS_MODEL = process.env.FIREWORKS_MODEL; // required
 const BACKEND_API_KEY = process.env.BACKEND_API_KEY; // optional: if set, require x-api-key header
 
+// Optional: load Oura OAuth client secret from Supabase when env vars are unset
+let _supabaseAdmin = null;
+let _supabaseAdminTried = false;
+
+function getSupabaseServiceConfig() {
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const key = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    ''
+  ).trim();
+  return { url, key, ok: Boolean(url && key) };
+}
+
+function getSupabaseAdmin() {
+  if (_supabaseAdminTried) return _supabaseAdmin;
+  _supabaseAdminTried = true;
+  const { url, key, ok } = getSupabaseServiceConfig();
+  if (!ok) return null;
+  try {
+    const { createClient } = require('@supabase/supabase-js');
+    _supabaseAdmin = createClient(url, key, { auth: { persistSession: false } });
+  } catch (e) {
+    console.error('[Oura OAuth] Supabase client init failed:', e);
+    _supabaseAdmin = null;
+  }
+  return _supabaseAdmin;
+}
+
+/**
+ * @returns {Promise<
+ *   | { ok: true, clientId: string, clientSecret: string, source: 'env' | 'database' }
+ *   | { ok: false, diagnostic: Record<string, unknown> }
+ * >}
+ */
+async function getOuraOAuthCredentialsDetailed() {
+  const envId = (process.env.OURA_CLIENT_ID || '').trim();
+  const envSecret = (process.env.OURA_CLIENT_SECRET || '').trim();
+  if (envId && envSecret) {
+    return { ok: true, clientId: envId, clientSecret: envSecret, source: 'env' };
+  }
+
+  const { ok: hasSupabaseEnv, url: supabaseUrl } = getSupabaseServiceConfig();
+  const hasPartialOuraEnv = Boolean((envId && !envSecret) || (!envId && envSecret));
+
+  if (!hasSupabaseEnv) {
+    return {
+      ok: false,
+      diagnostic: {
+        hasOuraEnvPair: Boolean(envId && envSecret),
+        hasPartialOuraEnv,
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasServiceRoleKey: Boolean(
+          (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim(),
+        ),
+        hint:
+          'On this server, set OURA_CLIENT_ID and OURA_CLIENT_SECRET (e.g. Vercel → backend project → Environment Variables), OR set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY so the backend can read public.server_integration_secrets.',
+      },
+    };
+  }
+
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    return {
+      ok: false,
+      diagnostic: {
+        hasSupabaseEnv: true,
+        supabaseClientInitialized: false,
+        hint: 'SUPABASE_URL and service role key are set but createClient failed. Check backend logs and that @supabase/supabase-js is installed.',
+      },
+    };
+  }
+
+  const { data, error } = await sb
+    .from('server_integration_secrets')
+    .select('key, value')
+    .in('key', ['oura_client_id', 'oura_client_secret']);
+
+  if (error) {
+    console.error('[Oura OAuth] Supabase read error:', error.code, error.message);
+    return {
+      ok: false,
+      diagnostic: {
+        hasSupabaseEnv: true,
+        supabaseClientInitialized: true,
+        supabaseError: error.message,
+        supabaseCode: error.code,
+        hint: 'Service role could not read server_integration_secrets. Confirm the migration ran on this same Supabase project and the service role key matches that project.',
+      },
+    };
+  }
+
+  const rows = data || [];
+  const map = Object.fromEntries(rows.map((r) => [r.key, String(r.value || '').trim()]));
+  if (map.oura_client_id && map.oura_client_secret) {
+    return {
+      ok: true,
+      clientId: map.oura_client_id,
+      clientSecret: map.oura_client_secret,
+      source: 'database',
+    };
+  }
+
+  return {
+    ok: false,
+    diagnostic: {
+      hasSupabaseEnv: true,
+      supabaseClientInitialized: true,
+      dbRowsForOuraKeys: rows.length,
+      keysFound: rows.map((r) => r.key),
+      hint:
+        rows.length === 0
+          ? 'Table is readable but no oura_* rows. INSERT oura_client_id and oura_client_secret into public.server_integration_secrets in this Supabase project.'
+          : 'Need both oura_client_id and oura_client_secret rows (non-empty values).',
+    },
+  };
+}
+
 // Passio Nutrition AI config (keep API key on server; do NOT put it in the mobile app)
 const PASSIO_API_KEY = process.env.PASSIO_API_KEY; // Required - must be set in Vercel environment variables
 const PASSIO_BASE_URL = 'https://api.passiolife.com/v2';
@@ -330,6 +448,87 @@ app.post('/passio/recognize-image', bodyParser.json({ limit: '100mb' }), async (
   } catch (err) {
     console.error('Passio image recognition error:', err);
     return res.status(500).json({
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
+// Oura OAuth — health check (GET): confirms URL + whether credentials resolve (no secrets returned)
+app.get('/integrations/oura/oauth/exchange', async (req, res) => {
+  const r = await getOuraOAuthCredentialsDetailed();
+  res.json({
+    ok: true,
+    message: 'Oura exchange endpoint. POST JSON body: { code, redirectUri? }.',
+    credentialsConfigured: r.ok,
+    source: r.ok ? r.source : 'none',
+    ...(r.ok ? {} : { details: r.diagnostic }),
+  });
+});
+
+// Oura OAuth token exchange
+// Body: { code: string, redirectUri?: string }
+app.post('/integrations/oura/oauth/exchange', async (req, res) => {
+  try {
+    if (BACKEND_API_KEY) {
+      const clientKey = req.header('x-api-key');
+      if (!clientKey || clientKey !== BACKEND_API_KEY) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+
+    const { code, redirectUri } = req.body || {};
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ error: 'code (string) is required' });
+    }
+
+    const OURA_TOKEN_URL = process.env.OURA_TOKEN_URL || 'https://api.ouraring.com/oauth/token';
+    const credsResult = await getOuraOAuthCredentialsDetailed();
+
+    if (!credsResult.ok) {
+      return res.status(500).json({
+        success: false,
+        error:
+          'Oura OAuth not configured on this server. Use GET on this same URL to see details (no secrets).',
+        details: credsResult.diagnostic,
+      });
+    }
+    const creds = credsResult;
+
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('code', code);
+    if (redirectUri) params.append('redirect_uri', redirectUri);
+    params.append('client_id', creds.clientId);
+    params.append('client_secret', creds.clientSecret);
+
+    const tokenRes = await fetch(OURA_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: params.toString(),
+    });
+
+    const tokenData = await tokenRes.json().catch(() => ({}));
+
+    if (!tokenRes.ok) {
+      return res.status(tokenRes.status).json({
+        success: false,
+        error: tokenData?.error_description || tokenData?.error || 'Oura token exchange failed',
+      });
+    }
+
+    // Tokens are sensitive; we only return "success" + non-sensitive metadata.
+    return res.json({
+      success: true,
+      token_type: tokenData?.token_type,
+      expires_in: tokenData?.expires_in,
+      scope: tokenData?.scope || tokenData?.scopes,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
       error: err instanceof Error ? err.message : String(err),
     });
   }

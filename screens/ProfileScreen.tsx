@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,13 +14,184 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
 import { User } from '../contexts/AppContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ProfileScreenProps {
   navigation: any;
 }
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
+  const { colors } = useTheme();
   const { state, dispatch } = useApp();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 12,
+          paddingTop: 8,
+          paddingBottom: 12,
+          backgroundColor: colors.headerBackground,
+        },
+        headerBackButton: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255,255,255,0.12)',
+        },
+        headerTitle: {
+          flex: 1,
+          textAlign: 'center',
+          fontSize: 18,
+          fontWeight: '800',
+          color: colors.tabBarInactive,
+        },
+        scrollView: {
+          flex: 1,
+        },
+        scrollContent: {
+          padding: 20,
+          paddingBottom: 100,
+        },
+        title: {
+          fontSize: 28,
+          fontWeight: 'bold',
+          color: colors.textPrimary,
+          marginBottom: 20,
+          textAlign: 'center',
+        },
+        card: {
+          backgroundColor: colors.surface,
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 20,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+            android: {
+              elevation: 4,
+            },
+          }),
+        },
+        cardHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 20,
+        },
+        cardTitle: {
+          fontSize: 20,
+          fontWeight: 'bold',
+          color: colors.accent,
+        },
+        inputRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+        },
+        inputHalf: {
+          flex: 1,
+          marginHorizontal: 4,
+        },
+        inputThird: {
+          flex: 1,
+          marginHorizontal: 2,
+        },
+        inputFull: {
+          flex: 1,
+        },
+        inputLabel: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.textPrimary,
+          marginBottom: 8,
+        },
+        input: {
+          backgroundColor: colors.surfaceMuted,
+          borderRadius: 8,
+          padding: 12,
+          fontSize: 16,
+          color: colors.textPrimary,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        optionGroup: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        optionButton: {
+          backgroundColor: colors.surfaceMuted,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        optionButtonSelected: {
+          backgroundColor: colors.buttonPrimary,
+          borderColor: colors.buttonPrimary,
+        },
+        optionButtonText: {
+          fontSize: 12,
+          color: colors.textSecondary,
+          fontWeight: '500',
+        },
+        optionButtonTextSelected: {
+          color: colors.tabBarActive,
+        },
+        saveButton: {
+          backgroundColor: colors.buttonPrimary,
+          borderRadius: 12,
+          padding: 16,
+          alignItems: 'center',
+          marginTop: 16,
+        },
+        saveButtonText: {
+          color: colors.tabBarActive,
+          fontSize: 16,
+          fontWeight: '600',
+        },
+        profileInfo: {
+          marginBottom: 16,
+        },
+        profileText: {
+          fontSize: 16,
+          color: colors.textPrimary,
+          marginBottom: 8,
+          lineHeight: 24,
+        },
+        profileLabel: {
+          fontWeight: '600',
+          color: colors.accent,
+        },
+        goalDescription: {
+          fontSize: 14,
+          color: colors.textSecondary,
+          fontStyle: 'italic',
+          lineHeight: 20,
+          backgroundColor: colors.surfaceMuted,
+          padding: 12,
+          borderRadius: 8,
+        },
+      }),
+    [colors]
+  );
+
   const [userProfile, setUserProfile] = useState<Partial<User>>({
     firstName: '',
     lastName: '',
@@ -82,7 +253,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           <Ionicons 
             name={isEditingProfile ? "checkmark" : "pencil"} 
             size={24} 
-            color="#B9A68D" 
+            color={colors.textMuted} 
           />
         </TouchableOpacity>
       </View>
@@ -97,6 +268,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 value={userProfile.firstName}
                 onChangeText={(text) => setUserProfile({ ...userProfile, firstName: text })}
                 placeholder="Enter first name"
+                placeholderTextColor={colors.textMuted}
               />
             </View>
             <View style={styles.inputHalf}>
@@ -106,6 +278,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 value={userProfile.lastName}
                 onChangeText={(text) => setUserProfile({ ...userProfile, lastName: text })}
                 placeholder="Enter last name"
+                placeholderTextColor={colors.textMuted}
               />
             </View>
           </View>
@@ -118,6 +291,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 value={userProfile.age?.toString()}
                 onChangeText={(text) => setUserProfile({ ...userProfile, age: parseInt(text) || 0 })}
                 placeholder="Age"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
               />
             </View>
@@ -128,6 +302,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 value={userProfile.weight?.toString()}
                 onChangeText={(text) => setUserProfile({ ...userProfile, weight: parseFloat(text) || 0 })}
                 placeholder="Weight"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
               />
             </View>
@@ -138,6 +313,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 value={userProfile.height?.toString()}
                 onChangeText={(text) => setUserProfile({ ...userProfile, height: parseFloat(text) || 0 })}
                 placeholder="Height"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
               />
             </View>
@@ -262,151 +438,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack?.()}
+          style={styles.headerBackButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.tabBarInactive} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <View style={{ width: 40 }} />
+      </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Profile</Text>
-        
         {renderProfileSection()}
 
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#CDC4B7',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2A2A2A',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: '#E6E1D8',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0090A3',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  inputHalf: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  inputThird: {
-    flex: 1,
-    marginHorizontal: 2,
-  },
-  inputFull: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2A2A2A',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F3EEE7',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#2A2A2A',
-    borderWidth: 1,
-    borderColor: '#D0C7B8',
-  },
-  optionGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  optionButton: {
-    backgroundColor: '#F3EEE7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D0C7B8',
-  },
-  optionButtonSelected: {
-    backgroundColor: '#0090A3',
-    borderColor: '#0090A3',
-  },
-  optionButtonText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  optionButtonTextSelected: {
-    color: 'white',
-  },
-  saveButton: {
-    backgroundColor: '#0090A3',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  profileInfo: {
-    marginBottom: 16,
-  },
-  profileText: {
-    fontSize: 16,
-    color: '#2A2A2A',
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  profileLabel: {
-    fontWeight: '600',
-    color: '#0090A3',
-  },
-  goalDescription: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-    lineHeight: 20,
-    backgroundColor: '#F3EEE7',
-    padding: 12,
-    borderRadius: 8,
-  },
-});

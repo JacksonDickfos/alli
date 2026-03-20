@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView } from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, Alert, Image, TouchableOpacity, Platform, Animated, ScrollView, SafeAreaView, Linking } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,6 +13,7 @@ import { Animated as RNAnimated } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from './lib/supabase';
 import { AppProvider } from './contexts/AppContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import AlliChatScreen from './components/AlliChatScreen';
 import HomeScreen from './screens/HomeScreen';
 import NutritionScreen from './screens/NutritionScreen';
@@ -23,6 +24,18 @@ import ProfileScreen from './screens/ProfileScreen';
 import AccountScreen from './screens/AccountScreen';
 import MenuScreen from './screens/MenuScreen';
 import ComingSoonScreen from './screens/ComingSoonScreen';
+import ConnectedDevicesScreen from './screens/ConnectedDevicesScreen';
+import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
+import { ENABLE_THEME_PICKER } from './theme/themePickerFeature';
+import type { ThemeColors } from './theme/palettes';
+import { exchangeOuraAuthCode } from './integrations/oura/ouraApi';
+import {
+  clearOuraRedirectState,
+  getOuraRedirectUriValue,
+  isOuraRedirectUrl,
+  parseOuraAuthRedirect,
+  verifyOuraRedirectState,
+} from './integrations/oura/ouraOAuth';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -50,15 +63,99 @@ const getLogoSource = () => {
 };
 
 // Legacy NutritionScreen removed - using new NutritionScreen component
-function NoticeBanner({ message, type = 'info' }: { message: string; type?: 'info' | 'success' | 'error' }) {
+function NoticeBanner({
+  message,
+  type = 'info',
+  colors,
+}: {
+  message: string;
+  type?: 'info' | 'success' | 'error';
+  colors: ThemeColors;
+}) {
   if (!message) return null as any;
-  const background = type === 'success' ? '#E7F6EC' : type === 'error' ? '#FDECEC' : '#F3F4F6';
-  const color = type === 'success' ? '#0F5132' : type === 'error' ? '#842029' : '#111827';
+  const background =
+    type === 'success'
+      ? 'rgba(46, 125, 50, 0.15)'
+      : type === 'error'
+        ? 'rgba(211, 47, 47, 0.12)'
+        : colors.surfaceMuted;
+  const color =
+    type === 'success' ? '#0F5132' : type === 'error' ? '#842029' : colors.textPrimary;
   return (
     <View style={{ backgroundColor: background, padding: 12, borderRadius: 8, marginBottom: 12 }}>
       <Text style={{ color }}>{message}</Text>
     </View>
   );
+}
+
+function createAuthStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    authContainer: {
+      flex: 1,
+      backgroundColor: colors.headerBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    input: {
+      width: '100%',
+      height: 50,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 15,
+      marginBottom: 15,
+      backgroundColor: colors.surfaceMuted,
+      color: colors.textPrimary,
+    },
+    button: {
+      width: '100%',
+      height: 50,
+      backgroundColor: colors.buttonPrimary,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 15,
+    },
+    buttonDisabled: {
+      opacity: 0.55,
+    },
+    quickLoginButton: {
+      backgroundColor: colors.gradientPurple[2],
+      padding: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      marginTop: 12,
+      width: '100%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    faceIdButton: {
+      width: '100%',
+      height: 50,
+      backgroundColor: colors.gradientPurple[1],
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 15,
+      flexDirection: 'row',
+    },
+    buttonText: {
+      color: colors.tabBarActive,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    link: {
+      color: colors.link,
+      marginTop: 15,
+      textDecorationLine: 'underline',
+    },
+  });
 }
 
 function parseAuthMessageFromUrl(): { banner: string; type: 'success' | 'error' | 'info' } | null {
@@ -84,6 +181,8 @@ function SignUpScreen({ navigation, onAuth }: any) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createAuthStyles(colors), [colors]);
 
   const handleSignUp = async () => {
     const trimmedEmail = email.trim();
@@ -127,10 +226,11 @@ function SignUpScreen({ navigation, onAuth }: any) {
         source={getLogoSource()}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
-      {notice && <NoticeBanner message={notice.text} type={notice.type} />}
+      {notice && <NoticeBanner message={notice.text} type={notice.type} colors={colors} />}
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         value={email}
         onChangeText={setEmail}
@@ -140,6 +240,7 @@ function SignUpScreen({ navigation, onAuth }: any) {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -154,7 +255,7 @@ function SignUpScreen({ navigation, onAuth }: any) {
         </Text>
       </TouchableOpacity>
       <Text style={styles.link} onPress={() => navigation.navigate('Login')}>Already have an account? Log In</Text>
-      <StatusBar style="auto" />
+      <StatusBar style={colors.statusBarStyle === 'light' ? 'light' : 'dark'} />
     </View>
   );
 }
@@ -170,6 +271,8 @@ function LoginScreen({ navigation, onAuth }: any) {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState<{email: string, password: string} | null>(null);
   const [isDevMode, setIsDevMode] = useState(__DEV__);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createAuthStyles(colors), [colors]);
 
   useEffect(() => {
     const msg = parseAuthMessageFromUrl();
@@ -428,13 +531,14 @@ function LoginScreen({ navigation, onAuth }: any) {
         source={getLogoSource()}
         style={{ width: 180, height: 180, resizeMode: 'contain', marginBottom: 20 }}
       />
-      {notice && <NoticeBanner message={notice.text} type={notice.type} />}
+      {notice && <NoticeBanner message={notice.text} type={notice.type} colors={colors} />}
 
       {isRecoveryMode ? (
         <>
           <TextInput
             style={styles.input}
             placeholder="New password"
+            placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={newPassword}
             onChangeText={setNewPassword}
@@ -442,6 +546,7 @@ function LoginScreen({ navigation, onAuth }: any) {
           <TextInput
             style={styles.input}
             placeholder="Confirm new password"
+            placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -462,6 +567,7 @@ function LoginScreen({ navigation, onAuth }: any) {
           <TextInput
             style={styles.input}
             placeholder="Email"
+            placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
@@ -471,6 +577,7 @@ function LoginScreen({ navigation, onAuth }: any) {
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -491,7 +598,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               onPress={handleFaceIDLogin} 
               disabled={loading}
             >
-              <Ionicons name="face-id" size={24} color="white" style={{ marginRight: 8 }} />
+              <Ionicons name="face-id" size={24} color={colors.tabBarActive} style={{ marginRight: 8 }} />
               <Text style={styles.buttonText}>
                 {loading ? 'Authenticating...' : 'Log In with Face ID'}
               </Text>
@@ -506,7 +613,7 @@ function LoginScreen({ navigation, onAuth }: any) {
               onPress={handleQuickLogin} 
               disabled={loading}
             >
-              <Ionicons name="flash" size={24} color="white" style={{ marginRight: 8 }} />
+              <Ionicons name="flash" size={24} color={colors.tabBarActive} style={{ marginRight: 8 }} />
               <Text style={styles.buttonText}>
                 {loading ? 'Logging in...' : 'Quick Login (Simulator)'}
               </Text>
@@ -518,7 +625,7 @@ function LoginScreen({ navigation, onAuth }: any) {
         </>
       )}
 
-      <StatusBar style="auto" />
+      <StatusBar style={colors.statusBarStyle === 'light' ? 'light' : 'dark'} />
     </View>
   );
 }
@@ -545,25 +652,30 @@ function AuthStack({ onAuth }: any) {
 // Menu Stack Navigator for handling Profile and Account screens
 function MenuStackNavigator({ onLogout }: { onLogout: () => void }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="MenuMain" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MenuMain" component={MenuScreen} />
       <Stack.Screen name="Goals" component={GoalsOnlyScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Account">
         {(props) => <AccountScreen {...props} onLogout={onLogout} />}
       </Stack.Screen>
+      <Stack.Screen name="ConnectedDevices" component={ConnectedDevicesScreen} />
+      {ENABLE_THEME_PICKER ? (
+        <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
+      ) : null}
     </Stack.Navigator>
   );
 }
 
 // Main tab navigator component
 function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#CDC4B7',
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '500',
@@ -590,7 +702,7 @@ function MainTabNavigator({ onLogout }: { onLogout: () => void }) {
         },
         tabBarStyle: {
           height: 80,
-          backgroundColor: '#28657A',
+          backgroundColor: colors.tabBar,
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
@@ -641,6 +753,7 @@ type AlliTabBarButtonProps = {
 };
 
 function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
+  const { colors } = useTheme();
   const pulse = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
@@ -688,7 +801,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
       >
         <RNAnimated.View style={{ transform: [{ scale }], opacity }}>
           <LinearGradient
-            colors={[ '#4F8EF7', '#8A2BE2', '#FF3B30' ]}
+            colors={colors.gradientPurple}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
@@ -704,7 +817,7 @@ function AlliTabBarButton({ children, onPress }: AlliTabBarButtonProps) {
                 width: 56,
                 height: 56,
                 borderRadius: 28,
-                backgroundColor: '#28657A',
+                backgroundColor: colors.alliChipInner,
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
@@ -749,10 +862,20 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <AppRoot />
+    </ThemeProvider>
+  );
+}
+
+function AppRoot() {
+  const { colors } = useTheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [bootTimedOut, setBootTimedOut] = useState(false);
+  const lastHandledOuraCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setBootTimedOut(true), 4000);
@@ -787,6 +910,74 @@ export default function App() {
     }, 4 * 60 * 1000); // Refresh every 4 minutes (tokens last 1 hour)
 
     return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Oura OAuth redirect handling (alli://oauth/oura?code=...).
+  useEffect(() => {
+    const handleUrlEvent = async (event: { url: string }) => {
+      const url = event?.url;
+      if (!url) return;
+      if (!isOuraRedirectUrl(url)) return;
+
+      const parsed = parseOuraAuthRedirect(url);
+      if (!parsed) return;
+
+      const code = parsed.code;
+      const errorFromOura = parsed.error;
+      const stateFromRedirect = parsed.state;
+
+      if (!code || errorFromOura) {
+        const errorMessage = errorFromOura || 'Oura authorization failed (no code returned).';
+        await AsyncStorage.setItem('oura_connect_status', 'error').catch(() => {});
+        await AsyncStorage.removeItem('oura_exchanging_started_at').catch(() => {});
+        await AsyncStorage.setItem('oura_connect_error', errorMessage).catch(() => {});
+        Alert.alert('Oura authorization failed', errorMessage);
+        return;
+      }
+
+      if (lastHandledOuraCodeRef.current === code) return;
+      lastHandledOuraCodeRef.current = code;
+
+      try {
+        await AsyncStorage.setItem('oura_connect_status', 'exchanging').catch(() => {});
+        await AsyncStorage.setItem('oura_connect_error', '').catch(() => {});
+
+        // CSRF/flow protection: if we stored a state when starting auth, verify it.
+        const stateOk = await verifyOuraRedirectState(stateFromRedirect);
+        if (!stateOk) {
+          const msg = 'Oura authorization state mismatch. Please reconnect your Oura ring.';
+          await AsyncStorage.setItem('oura_connect_status', 'error').catch(() => {});
+          await AsyncStorage.removeItem('oura_exchanging_started_at').catch(() => {});
+          await AsyncStorage.setItem('oura_connect_error', msg).catch(() => {});
+          Alert.alert('Oura connect failed', msg);
+          return;
+        }
+
+        await exchangeOuraAuthCode(code, getOuraRedirectUriValue());
+
+        await AsyncStorage.setItem('oura_connected', 'true').catch(() => {});
+        await AsyncStorage.setItem('oura_connect_status', 'connected').catch(() => {});
+        await AsyncStorage.removeItem('oura_connect_error').catch(() => {});
+        await clearOuraRedirectState().catch(() => {});
+
+        Alert.alert('Oura connected', 'Your Oura Ring integration is now connected.');
+      } catch (e: any) {
+        const msg = e?.message || 'Failed to exchange Oura authorization code.';
+        await AsyncStorage.setItem('oura_connect_status', 'error').catch(() => {});
+        await AsyncStorage.removeItem('oura_exchanging_started_at').catch(() => {});
+        await AsyncStorage.setItem('oura_connect_error', msg).catch(() => {});
+        Alert.alert('Oura connect failed', msg);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleUrlEvent);
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrlEvent({ url });
+    });
+
+    return () => {
+      subscription?.remove?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -915,16 +1106,16 @@ export default function App() {
 
   if (loading && !bootTimedOut) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#0090A3' }}>Loading…</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.accent }}>Loading…</Text>
       </SafeAreaView>
     );
   }
   if (loading && bootTimedOut) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <Text style={{ color: '#0090A3', fontSize: 20, marginBottom: 8 }}>Still loading…</Text>
-        <Text style={{ color: '#333', textAlign: 'center' }}>If this persists, please reload the app.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: colors.accent, fontSize: 20, marginBottom: 8 }}>Still loading…</Text>
+        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>If this persists, please reload the app.</Text>
       </SafeAreaView>
     );
   }
@@ -959,97 +1150,3 @@ export default function App() {
     </AppProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#CDC4B7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  authContainer: {
-    flex: 1,
-    backgroundColor: '#28657A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  centered: {
-    flex: 1,
-    backgroundColor: '#CDC4B7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#0090A3',
-  },
-  input: {
-    width: '100%',
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    backgroundColor: 'white',
-  },
-  button: {
-    width: '100%',
-    height: 50,
-    backgroundColor: '#0090A3',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  quickLoginButton: {
-    backgroundColor: '#9B59B6', // Purple color to match your description
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 12,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  faceIdButton: {
-    width: '100%',
-    height: 50,
-    backgroundColor: '#6E006A',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-    flexDirection: 'row',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  link: {
-    color: '#0090A3',
-    marginTop: 15,
-    textDecorationLine: 'underline',
-  },
-  logItem: {
-    backgroundColor: 'white',
-    padding: 10,
-    marginVertical: 5,
-    borderRadius: 8,
-    width: 200,
-  },
-});
