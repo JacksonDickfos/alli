@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "vercel-build": "./build-simple.sh",
+    "build:web": "./build-simple.sh",
     "supabase:push": "bash scripts/push-supabase-migrations.sh"
   },
   "dependencies": {

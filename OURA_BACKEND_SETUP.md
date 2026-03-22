@@ -40,9 +40,9 @@ on conflict (key) do update set value = excluded.value, updated_at = now();
 
 ## 3. Set backend environment variables (primary + DB access)
 
-Variables must be set on **the Node server that serves `backend/index.js`** (e.g. a **separate Vercel project** rooted at `backend/`), not only in Supabase or the Expo app.
+Variables must be set on **the Node server that serves `backend/index.js`** (e.g. **Railway** with root directory `backend/`), not only in Supabase or the Expo app.
 
-On the host that runs `backend/` (e.g. Vercel, or `backend/.env` locally):
+On the host that runs `backend/` (e.g. Railway, or `backend/.env` locally):
 
 | Variable | Purpose |
 |----------|---------|
@@ -55,7 +55,7 @@ If `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` are both set, the backend **does no
 
 ## 4. Mobile app
 
-- Set **`EXPO_PUBLIC_BACKEND_URL`** to your deployed API origin (no trailing slash), e.g. `https://your-api.vercel.app`.  
+- Set **`EXPO_PUBLIC_BACKEND_URL`** to your deployed API origin (no trailing slash), e.g. `https://your-service.up.railway.app`.  
   If this is missing, `app.json` has `extra.backendUrl: ""`, so the app falls back to **`http://localhost:3001`** — that only works on a simulator pointed at your machine, not on a real device.
 - `EXPO_PUBLIC_OURA_CLIENT_ID` / redirect URI must match the Oura developer app.
 - Client secret must **not** appear in the Expo app; only the backend performs the code exchange.

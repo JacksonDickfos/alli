@@ -53,13 +53,11 @@ type RootTabParamList = {
 
 // Legacy components removed - using new screen components
 
-// Helper function for logo source
+// App branding (bundled — no external CDN). Override with EXPO_PUBLIC_BRAND_LOGO_URI if needed.
 const getLogoSource = () => {
-  if (Platform.OS === 'web') {
-    const v = Date.now();
-    return { uri: `https://alli-nu.vercel.app/logo.png?v=${v}` } as any;
-  }
-  return { uri: "https://alli-nu.vercel.app/logo.png?v=" + Date.now() } as any;
+  const uri = process.env.EXPO_PUBLIC_BRAND_LOGO_URI;
+  if (uri) return { uri } as any;
+  return require('./assets/icon.png');
 };
 
 // Legacy NutritionScreen removed - using new NutritionScreen component

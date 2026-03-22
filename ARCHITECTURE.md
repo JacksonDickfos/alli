@@ -70,7 +70,7 @@
 3. **Row-Level Security (RLS)**: Database security policies ensure users can only access their own data
 4. **Optimistic UI Updates**: Messages appear immediately in the chat with pending indicators
 5. **Multi-Platform Build**: Single codebase supports iOS, Android, and Web using Expo
-6. **Serverless Deployment**: Both frontend and backend deploy to Vercel as serverless functions
+6. **API Hosting**: The Express backend runs as a long-lived Node process on **Railway**; native apps ship via **EAS** / app stores. Optional static web output (`dist/`) can be hosted on any static host.
 
 ---
 
@@ -106,8 +106,8 @@
 - Model configured via environment variable (e.g., `openai/gpt-oss-120b:de-d058483d541a2bf3`)
 
 ### Deployment
-- **Vercel** - Serverless hosting for both frontend and backend
-- **Expo Application Services (EAS)** - Mobile app builds
+- **Railway** - Node/Express API (`backend/`)
+- **Expo Application Services (EAS)** - iOS and Android builds
 
 ---
 
@@ -128,7 +128,8 @@ alli/
 ├── backend/                         # Backend API (Express server)
 │   ├── index.js                     # Main server file
 │   ├── package.json                 # Backend dependencies
-│   ├── vercel.json                  # Backend deployment config
+│   ├── railway.toml                 # Railway deploy config (optional)
+│   ├── RAILWAY.md                   # Railway deployment steps
 │   └── .gitignore                   # Backend-specific ignores
 │
 ├── components/                      # React components
@@ -159,7 +160,6 @@ alli/
 ├── app.json                         # Expo configuration
 ├── package.json                     # Frontend dependencies
 ├── tsconfig.json                    # TypeScript configuration
-├── vercel.json                      # Frontend deployment config
 ├── webpack.config.js                # Webpack configuration
 ├── build-pwa.js                     # PWA build script (Node)
 ├── build-pwa.sh                     # PWA build script (Shell)
@@ -357,10 +357,9 @@ Key state variables:
    - Compares signature to detect new deploys
    - Shows reload banner when update available
 
-2. **Logo Loading**:
-   - Dynamically loads logo from Vercel domain
-   - Cache-busting with timestamp query parameter
-   - Fallback to local assets
+2. **Logo loading**:
+   - Bundled app icon by default (`assets/icon.png`)
+   - Optional `EXPO_PUBLIC_BRAND_LOGO_URI` for a remote logo URL
 
 #### **Styling**
 
@@ -818,20 +817,18 @@ AI chat completion proxy.
 - `frequency_penalty`: 0
 - `reasoning`: { enabled: false }
 
-#### **Server Startup**
+#### **Server startup**
 
 ```javascript
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
-  });
-}
+const listenHost = process.env.HOST || '0.0.0.0';
+app.listen(PORT, listenHost, () => {
+  console.log(`Backend server running on http://${listenHost}:${PORT}`);
+});
 
-module.exports = app;  // Export for Vercel
+module.exports = app;
 ```
 
-- **Local Development**: Starts Express server on port 3001
-- **Production (Vercel)**: Exports app for serverless function
+- **Local / Railway / Docker**: Listens on `PORT` (default 3001 locally; Railway sets `PORT` automatically)
 
 #### **Security Features**
 
@@ -1084,59 +1081,17 @@ All DDL statements use `IF NOT EXISTS` or `DROP ... IF EXISTS`:
 
 Simple config extending Expo's base TypeScript settings with strict mode enabled.
 
-### Frontend Deployment: `vercel.json`
+### Optional static web output
 
-```json
-{
-  "builds": [{
-    "src": "package.json",
-    "use": "@vercel/static-build",
-    "config": { "distDir": "dist" }
-  }],
-  "routes": [
-    { "src": "/_expo/static/(.*)", "dest": "/_expo/static/$1" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "src": "/favicon.ico", "dest": "/favicon.ico" },
-    { "src": "/apple-touch-icon\\.png", "dest": "/logo.png" },
-    { "src": "/logo.png", "dest": "/logo.png" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
-```
+The repo includes `build-simple.sh` and `npm run build:web`, which produce a minimal **`dist/`** folder. You can host that on any static file host (S3, Cloudflare Pages, Netlify, etc.) if you still need a marketing or demo page. The **native apps** do not depend on that deploy.
 
-**Build Process**:
-1. Runs `vercel-build` script from package.json
-2. Executes `./build-simple.sh`
-3. Outputs to `dist/` directory
+### Backend deployment: Railway
 
-**Routing**:
-- Static assets served from specific paths
-- All other routes fallback to `index.html` (SPA)
-- Apple touch icons redirect to logo
+See **`backend/RAILWAY.md`** and **`backend/railway.toml`**. Summary:
 
-### Backend Deployment: `backend/vercel.json`
-
-```json
-{
-  "version": 2,
-  "builds": [{
-    "src": "index.js",
-    "use": "@vercel/node"
-  }],
-  "routes": [{
-    "src": "/(.*)",
-    "dest": "index.js"
-  }],
-  "env": {
-    "NODE_ENV": "production"
-  }
-}
-```
-
-**Serverless Function**:
-- Single Node.js function from `index.js`
-- All routes handled by Express app
-- Environment set to production
+- Create a Railway service with **Root Directory** set to **`backend`**.
+- Set production environment variables (`FIREWORKS_*`, `PASSIO_*`, Oura/Supabase as needed — see `backend/.env.example`).
+- Attach a public HTTPS domain; use that origin for **`EXPO_PUBLIC_BACKEND_URL`** in EAS.
 
 ### Webpack Configuration: `webpack.config.js`
 
@@ -1164,7 +1119,7 @@ Minimal webpack config using Expo's default web configuration.
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "vercel-build": "./build-simple.sh"
+    "build:web": "./build-simple.sh"
   },
   "dependencies": { /* 22 dependencies */ },
   "devDependencies": { /* 3 dev dependencies */ }
@@ -1176,7 +1131,7 @@ Minimal webpack config using Expo's default web configuration.
 - `android`: Start with Android emulator
 - `ios`: Start with iOS simulator
 - `web`: Start web version
-- `vercel-build`: Build for production deployment
+- `build:web`: Produce `dist/` static output (optional)
 
 ### Backend Package: `backend/package.json`
 
@@ -1206,56 +1161,24 @@ Minimal backend dependencies with Node 18+ requirement.
 
 ## Deployment
 
-### Frontend Deployment (Vercel)
+### API (Railway)
 
-**Build Process**:
+1. Connect the GitHub repo to Railway; set service root to **`backend`**.
+2. Configure variables on the service (see `backend/RAILWAY.md` and `backend/.env.example`). Chat uses **Fireworks** (`FIREWORKS_API_KEY`, `FIREWORKS_MODEL`), not Novita, in the current `backend/index.js`.
+3. Copy the public API URL into **EAS** as **`EXPO_PUBLIC_BACKEND_URL`** and rebuild iOS/Android.
+
+### Optional static web
+
 ```bash
-# Triggered by vercel.json "vercel-build" script
-./build-simple.sh
+npm run build:web
+# Output in dist/ — upload to any static host if needed
 ```
 
-**Build Script** (`build-simple.sh`):
-```bash
-#!/bin/bash
-# Build Expo web app
-npx expo export:web
+**EAS / app env (mobile)**:
+- `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_BACKEND_URL`, optional `EXPO_PUBLIC_BACKEND_API_KEY`
 
-# Move output to dist/
-mkdir -p dist
-cp -r web-build/* dist/
-```
-
-**Deployment Flow**:
-1. Push to GitHub (main branch)
-2. Vercel webhook triggers build
-3. Runs `vercel-build` script
-4. Expo compiles React Native to web bundle
-5. Static files deployed to CDN
-6. Domain: `https://alli-nu.vercel.app`
-
-**Environment Variables** (Vercel Dashboard):
-- `EXPO_PUBLIC_SUPABASE_URL`: Supabase project URL
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key
-- `EXPO_PUBLIC_BACKEND_URL`: Backend API URL
-- `EXPO_PUBLIC_BACKEND_API_KEY`: Optional backend auth key
-
-### Backend Deployment (Vercel)
-
-**Deployment Flow**:
-1. Push to GitHub
-2. Vercel detects `backend/` folder
-3. Builds serverless function from `index.js`
-4. Deploys to `https://alli-backend.vercel.app`
-
-**Environment Variables** (Vercel Dashboard):
-- `NOVITA_API_KEY`: Novita AI API key (required)
-- `NOVITA_MODEL`: Model name (e.g., `openai/gpt-oss-120b:de-d058483d541a2bf3`)
-- `NOVITA_ENDPOINT`: API endpoint (default: novita.ai endpoint)
-- `BACKEND_API_KEY`: Optional auth key for client requests
-- `JWT_SECRET`: Secret for JWT signing
-- `NODE_ENV`: Set to "production"
-
-### Mobile App Deployment
+### Mobile app deployment (EAS)
 
 **iOS**:
 ```bash
@@ -1313,8 +1236,9 @@ eas submit --platform android
    
    Create `backend/.env`:
    ```env
-   NOVITA_API_KEY=your-novita-key
-   NOVITA_MODEL=openai/gpt-oss-120b:de-d058483d541a2bf3
+   FIREWORKS_API_KEY=your-fireworks-key
+   FIREWORKS_MODEL=your-model-id
+   PASSIO_API_KEY=your-passio-key
    BACKEND_API_KEY=optional-key
    JWT_SECRET=your-secret
    ```
@@ -1365,7 +1289,7 @@ npm run web
 
 **Web**:
 ```bash
-npm run vercel-build
+npm run build:web
 # Output in dist/
 ```
 
@@ -1392,7 +1316,7 @@ git commit -m "Description of changes"
 git push origin feature-name
 
 # Create pull request
-# Merge to main triggers Vercel deployment
+# Merge to main — deploy API via Railway (or your CI) as configured
 ```
 
 ---
@@ -1527,7 +1451,7 @@ git push origin feature-name
 - **Solution**: Check Supabase RLS policies, verify user is authenticated
 
 **Issue**: Deployment fails
-- **Solution**: Check build logs, verify environment variables in Vercel dashboard
+- **Solution**: Check build logs; verify environment variables on Railway (or your API host)
 
 ---
 
@@ -1537,7 +1461,7 @@ The Alli Nutrition App is a sophisticated, production-ready mobile application t
 
 ✅ **Secure Architecture**: API keys protected, RLS policies enforced
 ✅ **Excellent UX**: Smooth animations, optimistic updates, markdown rendering
-✅ **Scalable Backend**: Serverless design, stateless API
+✅ **Scalable Backend**: Stateless Express API on Railway (or any Node host)
 ✅ **Cross-Platform**: Single codebase for iOS, Android, Web
 ✅ **AI-Powered**: ChatGPT-style nutrition assistant
 ✅ **Well-Structured**: Clean folder organization, separation of concerns

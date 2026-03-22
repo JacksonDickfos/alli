@@ -91,7 +91,7 @@ async function getOuraOAuthCredentialsDetailed() {
           (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim(),
         ),
         hint:
-          'On this server, set OURA_CLIENT_ID and OURA_CLIENT_SECRET (e.g. Vercel → backend project → Environment Variables), OR set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY so the backend can read public.server_integration_secrets.',
+          'On this server, set OURA_CLIENT_ID and OURA_CLIENT_SECRET (e.g. Railway service Variables), OR set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY so the backend can read public.server_integration_secrets.',
       },
     };
   }
@@ -154,7 +154,7 @@ async function getOuraOAuthCredentialsDetailed() {
 }
 
 // Passio Nutrition AI config (keep API key on server; do NOT put it in the mobile app)
-const PASSIO_API_KEY = process.env.PASSIO_API_KEY; // Required - must be set in Vercel environment variables
+const PASSIO_API_KEY = process.env.PASSIO_API_KEY; // Required on the server (e.g. Railway Variables)
 const PASSIO_BASE_URL = 'https://api.passiolife.com/v2';
 
 // Passio token cache (in-memory for now; in production, use Redis or similar)
@@ -534,13 +534,10 @@ app.post('/integrations/oura/oauth/exchange', async (req, res) => {
   }
 });
 
-// For local development
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
-    console.log(`📦 Body parser configured with 100MB limit`);
-  });
-}
+const listenHost = process.env.HOST || '0.0.0.0';
+app.listen(PORT, listenHost, () => {
+  console.log(`Backend server running on http://${listenHost}:${PORT}`);
+  console.log(`📦 Body parser configured with 100MB limit`);
+});
 
-// Export for Vercel
 module.exports = app; 
