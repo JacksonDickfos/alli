@@ -36,11 +36,9 @@ import {
 
 registerGlobals();
 
-const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://alli-h8mq663x.livekit.cloud';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://62.72.35.123:8003/start_call2';
-const NOVITA_API_URL = process.env.EXPO_PUBLIC_NOVITA_API_URL;
-const NOVITA_API_KEY = process.env.EXPO_PUBLIC_NOVITA_API_KEY;
-const NOVITA_MODEL = process.env.EXPO_PUBLIC_NOVITA_MODEL;
+const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://tgs-g8ihpbv8.livekit.cloud';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://165.227.28.126:8005/start_call2';
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 const RAG_FALLBACK_URL = process.env.EXPO_PUBLIC_RAG_FALLBACK_URL;
 
 interface Message {
@@ -166,23 +164,18 @@ function AddToMealPlanButton({ content }: { content: string }) {
 }
 
 // ─── RAG response extractor ───────────────────────────────────────────────────
-// THE FIX: reads body as raw text first (never silently fails like .json() does),
-// then intelligently parses JSON and checks every known field name.
 async function extractRagResponse(ragRes: Response): Promise<string> {
-  // Step 1 — always read as text. This never throws unlike .json()
   const rawText = await ragRes.text();
   console.log('🔍 RAG raw body (first 400):', rawText.slice(0, 400));
 
   const trimmed = rawText.trim();
   if (!trimmed) return '';
 
-  // Step 2 — if not JSON-shaped, return as plain text directly
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
     console.log('✅ RAG plain text response');
     return trimmed;
   }
 
-  // Step 3 — parse JSON
   let j: any;
   try {
     j = JSON.parse(trimmed);
@@ -191,15 +184,12 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     return trimmed;
   }
 
-  // Step 4 — unwrap array e.g. [{ ... }]
   if (Array.isArray(j) && j.length > 0) j = j[0];
 
   console.log('🔍 RAG parsed keys:', Object.keys(j ?? {}));
 
-  // Step 5 — already a bare string
   if (typeof j === 'string') return j.trim();
 
-  // Step 6 — check every field name across all known RAG/LLM API shapes
   const candidates: Array<string | undefined> = [
     j?.output,
     j?.response,
@@ -213,10 +203,8 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     j?.completion,
     j?.bot,
     j?.assistant,
-    // OpenAI-compatible
     j?.choices?.[0]?.message?.content,
     j?.choices?.[0]?.text,
-    // nested under data
     j?.data?.output,
     j?.data?.response,
     j?.data?.text,
@@ -233,7 +221,6 @@ async function extractRagResponse(ragRes: Response): Promise<string> {
     }
   }
 
-  // Step 7 — nothing matched; log the full object so the correct key is visible
   console.warn('⚠️ RAG: no known field matched. Full object:', JSON.stringify(j));
   return '';
 }
@@ -325,16 +312,48 @@ export default function AlliScreen({ navigation }: AlliScreenProps) {
     setMessages(prev => [...prev, optimisticUser, optimisticAI]);
 
     try {
-      const systemPrompt = `You are Alli, a friendly and supportive nutrition assistant.
-${MEAL_PLAN_SYSTEM_PROMPT}
+      const systemPrompt = `You are Alli, a highly knowledgeable nutrition specialist assistant with extensive expertise in nutritional science research and clinical studies.
 
-HOW TO RESPOND:
-- Use simple, friendly language — no jargon
-- Be warm and encouraging  
-- Give practical, easy tips
-- Use short paragraphs and bullet points
-- Never diagnose or promise specific results
-`;
+Your expertise:
+- Nutritional science and evidence-based dietary guidelines
+- Macro and micronutrients (vitamins, minerals, proteins, fats, carbohydrates)
+- Food composition, nutritional values, and bioavailability
+- Clinical nutrition research and scientific literature
+- Peer-reviewed journals and research papers in nutrition science
+- Current nutritional guidelines from authoritative sources (WHO, USDA, FDA, European Food Safety Authority)
+- Dietary recommendations for various health goals and medical conditions
+- Nutritional biochemistry and metabolism
+
+Your knowledge base includes:
+- Leading nutrition and medical journals (The American Journal of Clinical Nutrition, Journal of Nutrition, The New England Journal of Medicine, JAMA, Clinical Nutrition, European Journal of Clinical Nutrition)
+- Food composition databases (USDA FoodData Central, FAO Regional Food Composition Tables)
+- Nutrient reference values from multiple countries (US, Canada, Australia, New Zealand, UK, EU)
+- Evidence-based nutritional interventions and their outcomes
+- Recent research findings and systematic reviews in nutrition
+
+Your personality:
+- Professional yet approachable and friendly
+- Patient and empathetic
+- Clear in explaining complex nutritional and scientific concepts
+- Non-judgmental about dietary choices
+- Supportive and encouraging
+- Committed to evidence-based practice
+
+Guidelines:
+- Listen carefully to the user's nutrition-related questions or concerns
+- Provide accurate, evidence-based nutritional information backed by scientific research
+- Reference scientific studies and research findings when relevant
+- Explain nutritional concepts in simple, understandable terms while maintaining scientific accuracy
+- Ask clarifying questions about dietary preferences, allergies, health conditions, or specific goals when relevant
+- Offer practical, actionable nutrition advice grounded in current research
+- Distinguish between well-established scientific consensus and emerging research
+- Always remind users that you're providing general nutrition information based on scientific literature, and they should consult healthcare professionals for personalized medical advice
+- Be respectful of different dietary preferences and cultural food practices
+- Stay current with the latest nutritional research and guidelines
+
+Your goal is to help users make informed decisions about their nutrition and dietary choices through friendly, expert guidance supported by scientific evidence and research.
+
+${MEAL_PLAN_SYSTEM_PROMPT}`;
 
       const messagesToSend = [
         { role: 'system' as const, content: systemPrompt },
@@ -349,70 +368,51 @@ HOW TO RESPOND:
 
       let assistantText = '';
 
-      // ── 1. Novita ──────────────────────────────────────────────────────────
-      try {
-        const controller = new AbortController();
-        const isMealPlan =
-          question.toLowerCase().includes('plan') ||
-          question.toLowerCase().includes('diet');
-        const tid = setTimeout(() => {
-          console.log('⏰ Novita timeout');
-          controller.abort();
-        }, isMealPlan ? 45_000 : 20_000);
-
-        const res = await fetch(NOVITA_API_URL as string, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${NOVITA_API_KEY?.trim()}`,
-          },
-          body: JSON.stringify({
-            model: NOVITA_MODEL,
-            messages: messagesToSend,
-            temperature: 0.3,
-            max_tokens: 1500,
-            reasoning: { enabled: false },
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(tid);
-
-        if (res.ok) {
-          const json = await res.json();
-          assistantText = String(json?.choices?.[0]?.message?.content || '').trim();
-          if (assistantText) console.log('✅ Novita OK. Length:', assistantText.length);
-        } else {
-          console.log('❌ Novita HTTP error:', res.status);
-        }
-      } catch (e: any) {
-        console.log('❌ Novita failed:', e.message);
-      }
-
-      // ── 2. RAG fallback ────────────────────────────────────────────────────
-      if (!assistantText && RAG_FALLBACK_URL) {
+      // ── 1. OpenAI (Primary) ────────────────────────────────────────────────
+      if (OPENAI_API_KEY) {
         try {
-          await new Promise(r => setTimeout(r, 800));
-          console.log('🔄 Falling back to RAG...');
+          console.log('🔄 Calling OpenAI...');
+          const controller = new AbortController();
+          const isMealPlan =
+            question.toLowerCase().includes('plan') ||
+            question.toLowerCase().includes('diet') ||
+            question.toLowerCase().includes('meal') ||
+            question.toLowerCase().includes('week') ||
+            question.toLowerCase().includes('food');
+          const tid = setTimeout(() => {
+            console.log('⏰ OpenAI timeout');
+            controller.abort();
+          }, isMealPlan ? 90_000 : 30_000);
 
-          const ragRes = await fetch(RAG_FALLBACK_URL, {
+          const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: question, timestamp: Date.now() }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${OPENAI_API_KEY.trim()}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: messagesToSend,
+              temperature: 0.7,
+              max_tokens: isMealPlan ? 4000 : 1500,
+            }),
+            signal: controller.signal,
           });
+          clearTimeout(tid);
 
-          if (ragRes.ok) {
-            assistantText = await extractRagResponse(ragRes);
-            console.log('✅ RAG final length:', assistantText.length);
+          if (openAiRes.ok) {
+            const data = await openAiRes.json();
+            assistantText = data?.choices?.[0]?.message?.content?.trim() || '';
+            console.log('✅ OpenAI responded. Length:', assistantText.length);
           } else {
-            console.log('❌ RAG HTTP error:', ragRes.status, ragRes.statusText);
+            console.log('❌ OpenAI HTTP error:', openAiRes.status);
           }
-        } catch (e) {
-          console.error('❌ RAG request threw:', e);
+        } catch (e: any) {
+          console.error('❌ OpenAI request failed:', e.message);
         }
       }
 
-      // ── 3. Commit or error ─────────────────────────────────────────────────
+      // ── 2. Commit or error ─────────────────────────────────────────────────
       if (assistantText) {
         setMessages(prev => [
           ...prev.filter(m => m.id !== optimisticAI.id),
@@ -557,14 +557,19 @@ HOW TO RESPOND:
     }
     setAgentState('connecting'); setConnectionError(null);
     try {
+      console.log('🔄 Fetching LiveKit token from:', BACKEND_URL);
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: '123', roomName: `room-123-${Date.now()}` }),
+        body: JSON.stringify({ agent_id: '123' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data?.data?.token) throw new Error('No token received');
+
+      console.log('✅ Received token. Length:', data.data.token.length);
+      console.log('🔗 Room URL:', data.data.url);
+
       await connectToRoom(data.data.token, data.data.url);
     } catch (err: any) {
       setConnectionError(err.message);
@@ -644,7 +649,7 @@ HOW TO RESPOND:
   const renderQuickSuggestions = () => (
     <View style={styles.suggestionsContainer}>
       <Text style={styles.suggestionsTitle}>Quick Questions:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
+      <ScrollView horizontal={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
         {[
           'What should my meal plan be?',
           'How do I lose weight?',
